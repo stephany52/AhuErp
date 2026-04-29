@@ -55,6 +55,7 @@ namespace AhuErp.UI.ViewModels
                              OrgStructureViewModel orgStructureVm,
                              SubstitutionsViewModel substitutionsVm,
                              MyDesktopViewModel myDesktopVm,
+                             NotificationPrefsViewModel notificationPrefsVm,
                              INotificationService notifications,
                              IDocumentNavigator navigator = null)
         {
@@ -83,6 +84,7 @@ namespace AhuErp.UI.ViewModels
                 new NavigationItem("Отчёты", RolePolicy.Reports, reportsVm),
                 new NavigationItem("Оргструктура", RolePolicy.OrgStructure, orgStructureVm),
                 new NavigationItem("Замещения", RolePolicy.Substitutions, substitutionsVm),
+                new NavigationItem("Уведомления (настройки)", RolePolicy.NotificationPrefs, notificationPrefsVm),
                 new NavigationItem("Журнал аудита", RolePolicy.AuditJournal, auditJournalVm),
             };
 

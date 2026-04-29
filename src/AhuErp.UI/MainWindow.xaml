@@ -61,6 +61,9 @@
         <DataTemplate DataType="{x:Type vm:MyDesktopViewModel}">
             <views:MyDesktopView />
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:NotificationPrefsViewModel}">
+            <views:NotificationPrefsView />
+        </DataTemplate>
     </Window.Resources>
 
     <Grid>

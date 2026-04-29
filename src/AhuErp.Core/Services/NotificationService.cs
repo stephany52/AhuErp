@@ -171,5 +171,35 @@ namespace AhuErp.Core.Services
 
         private static string BuildBody(DocumentTask t)
             => $"Документ #{t.DocumentId}. Срок: {t.Deadline:dd.MM.yyyy HH:mm}. {t.Description}";
+
+        public IReadOnlyList<NotificationPreference> ListPreferences(int employeeId)
+            => _repo.ListPreferences(employeeId);
+
+        public void SetPreference(int employeeId, NotificationKind kind,
+                                  NotificationChannel channel, bool isEnabled,
+                                  string emailOverride = null)
+        {
+            if (employeeId <= 0)
+                throw new ArgumentException("employeeId обязателен.", nameof(employeeId));
+
+            var existing = _repo.GetPreference(employeeId, kind);
+            if (existing == null)
+            {
+                _repo.SetPreference(new NotificationPreference
+                {
+                    EmployeeId = employeeId,
+                    Kind = kind,
+                    Channel = channel,
+                    IsEnabled = isEnabled,
+                    EmailOverride = string.IsNullOrWhiteSpace(emailOverride) ? null : emailOverride.Trim()
+                });
+                return;
+            }
+
+            existing.Channel = channel;
+            existing.IsEnabled = isEnabled;
+            existing.EmailOverride = string.IsNullOrWhiteSpace(emailOverride) ? null : emailOverride.Trim();
+            _repo.SetPreference(existing);
+        }
     }
 }

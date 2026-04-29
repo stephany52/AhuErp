@@ -158,6 +158,7 @@ namespace AhuErp.UI.Infrastructure
             services.AddTransient<OrgStructureViewModel>();
             services.AddTransient<SubstitutionsViewModel>();
             services.AddTransient<MyDesktopViewModel>();
+            services.AddTransient<NotificationPrefsViewModel>();
         }
     }
 }
