@@ -14,7 +14,7 @@ rem      на пустую БД и просит EF6 MigrationScaffolder сген
 rem      "дельту" между текущей моделью DbContext и последним .resx-Target.
 rem      В сгенерированном .resx будет КОРРЕКТНЫЙ полный снапшот модели.
 rem   5. Копирует свежий .resx поверх последней миграции
-rem      (по умолчанию 20260430000000_AddSearchIndex.resx) и удаляет
+rem      (по умолчанию 202604300000000_AddSearchIndex.resx) и удаляет
 rem      временные .cs / .Designer.cs / *_ResxSnapshot.resx.
 rem
 rem Использование:
@@ -46,7 +46,21 @@ if "%~2" neq "" (
     set "SCAFFOLD_DB=AhuErpDb_Scaffold"
 )
 
-set "TARGETMIG=20260430000000_AddSearchIndex"
+rem --- валидируем имена, которые подставляются в T-SQL, от инъекции -------
+rem  SCAFFOLD_DB идёт в `DROP DATABASE [...]`, SQLSERVER - в `-S ...` и в
+rem  App.config; допускаем только безопасный набор символов.
+echo %SCAFFOLD_DB%| findstr /R /X "[A-Za-z0-9_][A-Za-z0-9_]*" >nul || (
+    echo [X] SCAFFOLD_DB contains invalid characters: %SCAFFOLD_DB%
+    echo     Allowed: letters, digits, underscore.
+    goto :err
+)
+echo %SQLSERVER%| findstr /R /X "[A-Za-z0-9_.\\-]*" >nul || (
+    echo [X] SQLSERVER contains invalid characters: %SQLSERVER%
+    echo     Allowed: letters, digits, underscore, dot, backslash, hyphen.
+    goto :err
+)
+
+set "TARGETMIG=202604300000000_AddSearchIndex"
 
 set "ROOT=%~dp0.."
 pushd "%ROOT%" >nul
@@ -114,10 +128,10 @@ rem --- 5/7: бекапим старые .resx и запускаем scaffolder 
 echo === [5/7] Backup existing .resx and scaffold a fresh snapshot
 set "BACKUPDIR=%ROOT%\Migrations.backup-%RANDOM%%RANDOM%"
 mkdir "%BACKUPDIR%" >nul 2>&1
-copy /Y "%MIGS%\20260427000000_AddOrgAndSubstitution.resx" "%BACKUPDIR%\" >nul
-copy /Y "%MIGS%\20260428000000_AddNotifications.resx"     "%BACKUPDIR%\" >nul
-copy /Y "%MIGS%\20260429000000_AddSignatures.resx"        "%BACKUPDIR%\" >nul
-copy /Y "%MIGS%\20260430000000_AddSearchIndex.resx"       "%BACKUPDIR%\" >nul
+copy /Y "%MIGS%\202604270000000_AddOrgAndSubstitution.resx" "%BACKUPDIR%\" >nul
+copy /Y "%MIGS%\202604280000000_AddNotifications.resx"     "%BACKUPDIR%\" >nul
+copy /Y "%MIGS%\202604290000000_AddSignatures.resx"        "%BACKUPDIR%\" >nul
+copy /Y "%MIGS%\202604300000000_AddSearchIndex.resx"       "%BACKUPDIR%\" >nul
 echo Old .resx backed up to: %BACKUPDIR%
 
 for /f "delims=" %%F in ('dir /B /S /A:-D "%GEN%\bin\Debug\MigrationGenerator.exe" 2^>nul') do set "GENEXE=%%F"
@@ -168,6 +182,10 @@ echo  Updated: %MIGS%\%TARGETMIG%.resx
 echo  Backup : %BACKUPDIR%
 echo.
 echo Next steps:
+echo   0. (Один раз!) Дропни runtime LocalDB, чтобы EF6 не споткнулся на
+echo      старых 14-значных ID в __MigrationHistory:
+echo        sqlcmd -S "(localdb)\MSSQLLocalDB" -E -Q "IF DB_ID('AhuErpDb') IS NOT NULL BEGIN ALTER DATABASE [AhuErpDb] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [AhuErpDb]; END"
+echo      (dev-БД, данных не жалко - EF6 пересоздаст при первом запуске UI).
 echo   1. Открой решение в Visual Studio.
 echo   2. ВАЖНО: Build - Rebuild Solution (Ctrl+Shift+B - Rebuild). Это
 echo      пересоберёт AhuErp.UI и подцепит свежий AhuErp.Core.dll с

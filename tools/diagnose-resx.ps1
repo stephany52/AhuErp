@@ -7,7 +7,7 @@
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$resxPath = Join-Path $repoRoot 'src\AhuErp.Core\Migrations\20260430000000_AddSearchIndex.resx'
+$resxPath = Join-Path $repoRoot 'src\AhuErp.Core\Migrations\202604300000000_AddSearchIndex.resx'
 $logicalName = 'AhuErp.Core.Migrations.AddSearchIndex.resources'
 
 function Decode-EdmxFromResource([string]$dllPath) {

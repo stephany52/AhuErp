@@ -196,7 +196,7 @@ git clean -fd
 
    - Если `Up()`/`Down()` пусты — модель и слепок синхронны. Удали тестовую
      миграцию: `Remove-Migration -ProjectName AhuErp.Core -StartUpProjectName AhuErp.UI`,
-     закоммить обновлённый `20260430000000_AddSearchIndex.resx`, открой PR.
+     закоммить обновлённый `202604300000000_AddSearchIndex.resx`, открой PR.
    - Если в `Up()` есть `CreateTable/AddColumn` — значит модель ушла дальше,
      дополни код миграции и снова прогони батник.
 
