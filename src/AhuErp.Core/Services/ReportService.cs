@@ -528,6 +528,58 @@ namespace AhuErp.Core.Services
             }
         }
 
+        private static string FormatVehicleStatus(VehicleStatus status)
+        {
+            switch (status)
+            {
+                case VehicleStatus.Available: return "Доступен";
+                case VehicleStatus.OnMission: return "В рейсе";
+                case VehicleStatus.Maintenance: return "На обслуживании";
+                default: return status.ToString();
+            }
+        }
+
+        private static string FormatActionType(AuditActionType action)
+        {
+            switch (action)
+            {
+                case AuditActionType.Created: return "Создание";
+                case AuditActionType.Updated: return "Изменение";
+                case AuditActionType.Deleted: return "Удаление";
+                case AuditActionType.StatusChanged: return "Смена статуса";
+                case AuditActionType.Registered: return "Регистрация";
+                case AuditActionType.AssignedToCase: return "Прикреплено к делу";
+                case AuditActionType.AttachmentAdded: return "Добавлено вложение";
+                case AuditActionType.AttachmentVersioned: return "Новая версия";
+                case AuditActionType.AttachmentRemoved: return "Удалено вложение";
+                case AuditActionType.AttachmentViewed: return "Просмотр вложения";
+                case AuditActionType.ResolutionIssued: return "Резолюция";
+                case AuditActionType.TaskAssigned: return "Поручение";
+                case AuditActionType.TaskCompleted: return "Поручение исп.";
+                case AuditActionType.TaskOverdue: return "Поручение просрочено";
+                case AuditActionType.TaskReassigned: return "Поручение переназн.";
+                case AuditActionType.ApprovalSent: return "Маршрут запущен";
+                case AuditActionType.ApprovalSigned: return "Согласовано";
+                case AuditActionType.ApprovalRejected: return "Отклонено";
+                case AuditActionType.InventoryTransactionRecorded: return "Движение ТМЦ";
+                case AuditActionType.VehicleTripBooked: return "Путевой лист";
+                case AuditActionType.ArchiveRequestProcessed: return "Архивный запрос";
+                case AuditActionType.ItTicketResolved: return "ИТ-заявка";
+                case AuditActionType.SignatureAdded: return "Подписание";
+                case AuditActionType.SignatureRevoked: return "Отзыв подписи";
+                case AuditActionType.DocumentLocked: return "Блокировка КЭП";
+                case AuditActionType.NotificationSent: return "Уведомление";
+                case AuditActionType.SubstitutionCreated: return "Замещение создано";
+                case AuditActionType.SubstitutionCancelled: return "Замещение отменено";
+                case AuditActionType.TaskDelegated: return "Делегирование";
+                case AuditActionType.IndexRebuilt: return "Индексация";
+                case AuditActionType.ReportGenerated: return "Отчёт";
+                case AuditActionType.UserLogin: return "Вход";
+                case AuditActionType.UserLogout: return "Выход";
+                default: return action.ToString();
+            }
+        }
+
         private static string FormatCategory(InventoryCategory category)
         {
             switch (category)
@@ -710,7 +762,7 @@ namespace AhuErp.Core.Services
                     sheet.Cell(r, 4).Value = Math.Round(busy, 1);
                     sheet.Cell(r, 5).Value = Math.Round(Math.Max(0, periodHours - busy), 1);
                     sheet.Cell(r, 6).Value = trips.Count(t => t.DocumentId.HasValue);
-                    sheet.Cell(r, 7).Value = v.CurrentStatus.ToString();
+                    sheet.Cell(r, 7).Value = FormatVehicleStatus(v.CurrentStatus);
                     r++;
                 }
                 sheet.Columns().AdjustToContents();
@@ -799,7 +851,7 @@ namespace AhuErp.Core.Services
                 var hashShort = string.IsNullOrEmpty(e.Hash) ? "" : e.Hash.Substring(0, Math.Min(12, e.Hash.Length));
                 pdf.AddLine(string.Format("{0,-19} {1,-18} {2,-6} {3}",
                     e.Timestamp.ToString("dd.MM.yyyy HH:mm:ss"),
-                    Truncate(e.ActionType.ToString(), 18),
+                    Truncate(FormatActionType(e.ActionType), 22),
                     e.UserId?.ToString() ?? "—",
                     hashShort));
                 var details = string.IsNullOrEmpty(e.Details) ? e.NewValues : e.Details;

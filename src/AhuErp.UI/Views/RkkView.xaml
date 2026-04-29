@@ -382,7 +382,7 @@
                                 <DataGrid.Columns>
                                     <DataGridTextColumn Header="Подписан" Binding="{Binding SignedAt, StringFormat=dd.MM.yyyy HH:mm}" Width="140" />
                                     <DataGridTextColumn Header="Подписант" Binding="{Binding Signer.FullName}" Width="*" />
-                                    <DataGridTextColumn Header="Тип" Binding="{Binding Kind}" Width="100" />
+                                    <DataGridTextColumn Header="Тип" Binding="{Binding Kind, Converter={StaticResource EnumDisplayConverter}}" Width="160" />
                                     <DataGridTextColumn Header="Сертификат" Binding="{Binding CertificateSubject}" Width="240" />
                                     <DataGridTextColumn Header="Основание" Binding="{Binding Reason}" Width="200" />
                                     <DataGridCheckBoxColumn Header="Отозвано" Binding="{Binding IsRevoked}" Width="80" />

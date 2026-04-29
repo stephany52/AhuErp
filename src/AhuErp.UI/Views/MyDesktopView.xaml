@@ -45,7 +45,7 @@
                         <DataGridTextColumn Header="Документ" Binding="{Binding Document.Title}" Width="*" />
                         <DataGridTextColumn Header="Описание" Binding="{Binding Description}" Width="2*" />
                         <DataGridTextColumn Header="Срок" Binding="{Binding Deadline, StringFormat=dd.MM.yyyy HH:mm}" Width="140" />
-                        <DataGridTextColumn Header="Статус" Binding="{Binding Status}" Width="120" />
+                        <DataGridTextColumn Header="Статус" Binding="{Binding Status, Converter={StaticResource EnumDisplayConverter}}" Width="120" />
                     </DataGrid.Columns>
                 </DataGrid>
             </TabItem>
