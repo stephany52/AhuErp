@@ -3,6 +3,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using AhuErp.Core.Services;
 using AhuErp.UI.Converters;
+using AhuErp.UI.Infrastructure;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -16,6 +17,7 @@ namespace AhuErp.UI.ViewModels
     public partial class MainViewModel : ViewModelBase
     {
         private readonly IAuthService _auth;
+        private readonly RkkViewModel _rkkVm;
 
         public ObservableCollection<NavigationItem> NavigationItems { get; }
 
@@ -53,10 +55,16 @@ namespace AhuErp.UI.ViewModels
                              OrgStructureViewModel orgStructureVm,
                              SubstitutionsViewModel substitutionsVm,
                              MyDesktopViewModel myDesktopVm,
-                             INotificationService notifications)
+                             INotificationService notifications,
+                             IDocumentNavigator navigator = null)
         {
             _auth = auth ?? throw new ArgumentNullException(nameof(auth));
             _notifications = notifications ?? throw new ArgumentNullException(nameof(notifications));
+            _rkkVm = rkkVm;
+
+            // Регистрируемся в навигаторе документов, чтобы карточки и
+            // уведомления на «Моём рабочем столе» могли открывать РКК.
+            (navigator as DocumentNavigator)?.AttachMain(this);
 
             NavigationItems = new ObservableCollection<NavigationItem>
             {
@@ -100,6 +108,26 @@ namespace AhuErp.UI.ViewModels
         private void NavigateTo(NavigationItem item)
         {
             if (item != null && item.IsAllowed) SelectedNavigationItem = item;
+        }
+
+        /// <summary>
+        /// Phase 9 / A9 — переключиться на вкладку РКК и выбрать документ
+        /// по идентификатору. Вызывается из «Моего рабочего стола» по
+        /// двойному клику на карточке/уведомлении.
+        /// </summary>
+        public void NavigateToDocument(int documentId)
+        {
+            var item = NavigationItems.FirstOrDefault(n =>
+                n.IsAllowed && n.ViewModel is RkkViewModel);
+            if (item == null) return;
+
+            SelectedNavigationItem = item;
+
+            if (_rkkVm == null) return;
+            if (_rkkVm.ReloadCommand.CanExecute(null))
+                _rkkVm.ReloadCommand.Execute(null);
+            var doc = _rkkVm.Documents.FirstOrDefault(d => d.Id == documentId);
+            if (doc != null) _rkkVm.SelectedDocument = doc;
         }
 
         /// <summary>
