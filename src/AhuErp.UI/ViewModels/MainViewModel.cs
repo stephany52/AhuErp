@@ -1,5 +1,6 @@
 using System;
 using System.Collections.ObjectModel;
+using System.Linq;
 using AhuErp.Core.Services;
 using AhuErp.UI.Converters;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -112,10 +113,36 @@ namespace AhuErp.UI.ViewModels
         }
 
         [RelayCommand]
+        private void OpenMyDesktop()
+        {
+            var item = NavigationItems.FirstOrDefault(n =>
+                n.IsAllowed && n.ViewModel is MyDesktopViewModel);
+            if (item != null) SelectedNavigationItem = item;
+
+            // Принудительно перечитываем уведомления (счётчик в шапке + список
+            // на рабочем столе), чтобы открытие бейджем работало как «прочитать
+            // все непрочитанные».
+            if (item?.ViewModel is MyDesktopViewModel desk)
+            {
+                desk.Reload();
+            }
+            RefreshUnreadCount();
+        }
+
+        [RelayCommand]
         private void Logout()
         {
             _auth.Logout();
-            System.Windows.Application.Current.Shutdown();
+
+            // Закрываем главное окно и просим App перезапустить цикл
+            // login → main без выгрузки приложения. Полный Application.Shutdown
+            // выполняется только если пользователь не пройдёт повторный вход.
+            var mainWindow = System.Windows.Application.Current.MainWindow;
+            if (mainWindow != null)
+            {
+                mainWindow.Tag = "logout";
+                mainWindow.Close();
+            }
         }
 
         private void ApplyRolePolicy()
