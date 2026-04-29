@@ -99,6 +99,23 @@ namespace AhuErp.Core.Services
         public static bool CanViewReports(EmployeeRole r)
             => r == EmployeeRole.Admin || r == EmployeeRole.Manager || r == EmployeeRole.Archivist;
 
+        /// <summary>
+        /// Отмена связанной операции, привязанной к РКК (компенсирующее
+        /// списание ТМЦ или удаление путевого листа). Доступно администратору,
+        /// руководителю и материально-ответственному за ТМЦ / автопарк.
+        /// </summary>
+        public static bool CanCancelRelatedOperation(EmployeeRole r)
+            => r == EmployeeRole.Admin
+               || r == EmployeeRole.Manager
+               || r == EmployeeRole.WarehouseManager;
+
+        /// <summary>
+        /// Перестроение полнотекстового индекса (Phase 10). Тяжёлая операция,
+        /// разрешена только администратору.
+        /// </summary>
+        public static bool CanRebuildSearchIndex(EmployeeRole r)
+            => r == EmployeeRole.Admin;
+
         /// <summary>Полнотекстовый поиск доступен всем сотрудникам.</summary>
         public static bool CanFullTextSearch(EmployeeRole r) => true;
 

@@ -93,5 +93,44 @@ namespace AhuErp.Core.Services
             vehicle.CurrentStatus = VehicleStatus.OnMission;
             return newTrip;
         }
+
+        public VehicleTrip CancelTrip(int tripId, int actorId, string reason = null)
+        {
+            if (_repository == null)
+            {
+                throw new InvalidOperationException(
+                    "Для этой перегрузки требуется IVehicleRepository. Используйте конструктор FleetService(IVehicleRepository).");
+            }
+            if (actorId <= 0)
+            {
+                throw new ArgumentException("actorId обязателен для аудита отмены.", nameof(actorId));
+            }
+
+            var trip = _repository.GetTrip(tripId)
+                ?? throw new InvalidOperationException($"Путевой лист #{tripId} не найден.");
+
+            _repository.RemoveTrip(tripId);
+
+            // Если у ТС не осталось активных (пересекающихся с «сейчас») поездок,
+            // возвращаем статус Available. Это соответствует поведению BookVehicle,
+            // которое выставляет OnMission при создании.
+            var vehicle = _repository.GetVehicle(trip.VehicleId);
+            if (vehicle != null && vehicle.CurrentStatus == VehicleStatus.OnMission)
+            {
+                var now = DateTime.Now;
+                var stillActive = false;
+                foreach (var other in _repository.ListTrips(vehicle.Id))
+                {
+                    if (other.StartDate <= now && other.EndDate >= now)
+                    {
+                        stillActive = true;
+                        break;
+                    }
+                }
+                if (!stillActive) vehicle.CurrentStatus = VehicleStatus.Available;
+            }
+
+            return trip;
+        }
     }
 }

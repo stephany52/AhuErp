@@ -46,5 +46,15 @@ namespace AhuErp.Core.Services
             _ctx.VehicleTrips.Add(trip);
             _ctx.SaveChanges();
         }
+
+        public VehicleTrip GetTrip(int tripId) => _ctx.VehicleTrips.Find(tripId);
+
+        public void RemoveTrip(int tripId)
+        {
+            var trip = _ctx.VehicleTrips.Find(tripId);
+            if (trip == null) return;
+            _ctx.VehicleTrips.Remove(trip);
+            _ctx.SaveChanges();
+        }
     }
 }

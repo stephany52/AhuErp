@@ -43,5 +43,17 @@ namespace AhuErp.Core.Services
                 vehicle.Trips.Add(trip);
             }
         }
+
+        public VehicleTrip GetTrip(int tripId) =>
+            _trips.FirstOrDefault(t => t.Id == tripId);
+
+        public void RemoveTrip(int tripId)
+        {
+            var trip = _trips.FirstOrDefault(t => t.Id == tripId);
+            if (trip == null) return;
+            _trips.Remove(trip);
+            var vehicle = GetVehicle(trip.VehicleId);
+            vehicle?.Trips.Remove(trip);
+        }
     }
 }

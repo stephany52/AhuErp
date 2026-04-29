@@ -32,5 +32,17 @@ namespace AhuErp.Core.Services
         /// <exception cref="VehicleBookingException">Интервал занят, ТС на обслуживании или не найдено.</exception>
         /// <exception cref="ArgumentException">Некорректные параметры.</exception>
         VehicleTrip BookVehicle(int vehicleId, int documentId, DateTime startDate, DateTime endDate, string driverName);
+
+        /// <summary>
+        /// Отменяет ранее созданный путевой лист (например, ошибочно
+        /// привязанный к РКК). Запись физически удаляется из репозитория, а
+        /// статус ТС возвращается в <see cref="VehicleStatus.Available"/>,
+        /// если у него больше нет активных бронирований.
+        /// </summary>
+        /// <param name="tripId">Идентификатор отменяемой поездки.</param>
+        /// <param name="actorId">Кто инициирует отмену (для аудита).</param>
+        /// <param name="reason">Текстовое обоснование (попадает в журнал).</param>
+        /// <returns>Удалённая запись поездки (для аудита/уведомлений).</returns>
+        VehicleTrip CancelTrip(int tripId, int actorId, string reason = null);
     }
 }
