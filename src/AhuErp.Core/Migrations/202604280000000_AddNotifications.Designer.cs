@@ -7,13 +7,13 @@ namespace AhuErp.Core.Migrations
     using System.Resources;
 
     [GeneratedCode("EntityFramework.Migrations", "6.4.4")]
-    public sealed partial class AddSearchIndex : IMigrationMetadata
+    public sealed partial class AddNotifications : IMigrationMetadata
     {
-        private readonly ResourceManager Resources = new ResourceManager(typeof(AddSearchIndex));
+        private readonly ResourceManager Resources = new ResourceManager(typeof(AddNotifications));
 
         string IMigrationMetadata.Id
         {
-            get { return "20260430000000_AddSearchIndex"; }
+            get { return "202604280000000_AddNotifications"; }
         }
 
         string IMigrationMetadata.Source
