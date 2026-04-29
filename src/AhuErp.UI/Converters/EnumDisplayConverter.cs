@@ -133,6 +133,7 @@ namespace AhuErp.UI.Converters
             [AuditActionType.SubstitutionCreated] = "Замещение создано",
             [AuditActionType.SubstitutionCancelled] = "Замещение отменено",
             [AuditActionType.TaskDelegated] = "Поручение делегировано",
+            [AuditActionType.DepartmentHeadAssigned] = "Назначен руководитель отдела",
             [AuditActionType.IndexRebuilt] = "Поисковый индекс перестроен",
             [AuditActionType.ReportGenerated] = "Отчёт сформирован",
             [AuditActionType.UserLogin] = "Вход в систему",
