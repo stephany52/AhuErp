@@ -49,7 +49,10 @@
 
                 <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,8,0,0">
                     <Button Content="Сохранить" Command="{Binding SaveCommand}" MinWidth="100" Padding="8,4" Margin="0,0,6,0" />
-                    <Button Content="Зарегистрировать" Command="{Binding RegisterCommand}" MinWidth="140" Padding="8,4" />
+                    <Button Content="Зарегистрировать"
+                            Command="{Binding RegisterCommand}"
+                            ToolTip="Регистрационный номер формируется по шаблону вида документа: {Код}-{ДелоМ.Г.}/{Год}-{Порядковый}. Если документ не привязан к делу номенклатуры, в поле дела появится «Б/Н»."
+                            MinWidth="140" Padding="8,4" />
                 </StackPanel>
 
                 <TabControl>

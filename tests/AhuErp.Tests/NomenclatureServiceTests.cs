@@ -122,11 +122,14 @@ namespace AhuErp.Tests
             Assert.Equal("РСП-01-02/2026-00007", num);
         }
 
+        // A13: при регистрации без привязки к делу плейсхолдер CaseIndex
+        // заменяется на «Б/Н» (без номера дела), чтобы регномер сразу читался
+        // правильно вместо вводящего в заблуждение шифра «00».
         [Fact]
-        public void BuildRegistrationNumber_uses_zero_index_when_no_case_provided()
+        public void BuildRegistrationNumber_uses_no_case_marker_when_no_case_provided()
         {
             var num = _service.BuildRegistrationNumber(_orderType, null, 2026, 1);
-            Assert.Equal("АХУ-00/2026-00001", num);
+            Assert.Equal("АХУ-Б/Н/2026-00001", num);
         }
     }
 }
