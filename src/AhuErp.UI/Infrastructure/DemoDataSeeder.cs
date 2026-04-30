@@ -121,24 +121,32 @@ namespace AhuErp.UI.Infrastructure
             {
                 Name = "Бумага А4 500 л.",
                 Category = InventoryCategory.Stationery,
+                Unit = "пачка",
+                MinimumBalance = 10,
                 TotalQuantity = 40
             });
             inventory.AddItem(new InventoryItem
             {
                 Name = "Ручка шариковая синяя",
                 Category = InventoryCategory.Stationery,
+                Unit = "шт.",
+                MinimumBalance = 30,
                 TotalQuantity = 120
             });
             inventory.AddItem(new InventoryItem
             {
                 Name = "Картридж HP 59A",
                 Category = InventoryCategory.IT_Equipment,
+                Unit = "шт.",
+                MinimumBalance = 2,
                 TotalQuantity = 6
             });
             inventory.AddItem(new InventoryItem
             {
                 Name = "Средство для уборки помещений 5 л",
                 Category = InventoryCategory.Cleaning_Supplies,
+                Unit = "канистра",
+                MinimumBalance = 2,
                 TotalQuantity = 8
             });
         }

@@ -119,7 +119,7 @@
                             <StackPanel Grid.Column="5" Margin="0,0,6,0">
                                 <TextBlock Text="Шаблон номера" />
                                 <TextBox Text="{Binding NewTypeTemplate, UpdateSourceTrigger=PropertyChanged}"
-                                         ToolTip="{Код}-{ИндексДела}-{Год}-{Номер0000}"
+                                         ToolTip="{}{Код}-{ИндексДела}-{Год}-{Номер0000}"
                                          Padding="6" />
                             </StackPanel>
                             <Button Grid.Column="6" Content="Добавить" Command="{Binding AddTypeCommand}"

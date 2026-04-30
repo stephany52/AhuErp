@@ -37,6 +37,8 @@
                     <DataGridTextColumn Header="№" Binding="{Binding Id}" Width="40" />
                     <DataGridTextColumn Header="Наименование" Binding="{Binding Name}" Width="*" />
                     <DataGridTextColumn Header="Категория" Binding="{Binding Category, Converter={StaticResource EnumDisplayConverter}}" Width="140" />
+                    <DataGridTextColumn Header="Ед." Binding="{Binding Unit}" Width="70" />
+                    <DataGridTextColumn Header="Мин." Binding="{Binding MinimumBalance}" Width="70" />
                     <DataGridTextColumn Header="Остаток" Binding="{Binding TotalQuantity}" Width="100" />
                 </DataGrid.Columns>
             </DataGrid>

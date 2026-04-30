@@ -53,6 +53,7 @@ namespace AhuErp.Core.Services
             }
 
             item.TotalQuantity += quantityChange;
+            if (string.IsNullOrWhiteSpace(item.Unit)) item.Unit = "шт.";
 
             var transaction = new InventoryTransaction
             {

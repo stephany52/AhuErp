@@ -116,6 +116,8 @@ namespace AhuErp.UI.ViewModels
                 {
                     Name = NewItemName?.Trim(),
                     Category = NewItemCategory,
+                    Unit = string.IsNullOrWhiteSpace(NewItemUnit) ? "шт." : NewItemUnit.Trim(),
+                    MinimumBalance = NewItemMinimumBalance,
                     TotalQuantity = 0
                 });
                 StatusMessage = $"Добавлена позиция «{NewItemName}» ({NewItemUnit}, мин. остаток {NewItemMinimumBalance}).";
