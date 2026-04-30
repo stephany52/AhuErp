@@ -125,6 +125,41 @@ namespace AhuErp.UI.ViewModels
             }
         }
 
+        /// <summary>
+        /// B3 — пересобрать полнотекстовый индекс. Кнопка доступна только
+        /// администратору (см. <see cref="RolePolicy.CanRebuildSearchIndex"/>).
+        /// </summary>
+        [RelayCommand(CanExecute = nameof(CanRebuildIndex))]
+        private void RebuildIndex()
+        {
+            ErrorMessage = null;
+            if (_searchIndex == null)
+            {
+                ErrorMessage = "Поисковый индекс недоступен в этой сессии.";
+                return;
+            }
+            try
+            {
+                var count = _searchIndex.ReindexAll();
+                StatusMessage = $"Поисковый индекс перестроен: обработано {count} записей.";
+            }
+            catch (Exception ex)
+            {
+                ErrorMessage = ex.Message;
+            }
+        }
+
+        public bool CanRebuildIndex
+        {
+            get
+            {
+                if (_searchIndex == null) return false;
+                var role = _auth?.CurrentEmployee?.Role;
+                if (!role.HasValue) return true; // тесты без auth — разрешено
+                return RolePolicy.CanRebuildSearchIndex(role.Value);
+            }
+        }
+
         [RelayCommand]
         private void Reset()
         {

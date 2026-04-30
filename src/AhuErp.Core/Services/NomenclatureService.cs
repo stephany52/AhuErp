@@ -160,7 +160,12 @@ namespace AhuErp.Core.Services
                     case "Code":
                         return typeRef.ShortCode ?? typeRef.Name;
                     case "CaseIndex":
-                        return @case?.Index ?? "00";
+                        // Если документ зарегистрирован без привязки к делу
+                        // (caseId не указан) — заменяем плейсхолдер на «Б/Н»,
+                        // чтобы регномер сразу читался как «без номера дела»,
+                        // а не вводил пользователя в заблуждение шифром «00»
+                        // (см. дефект A13).
+                        return @case?.Index ?? "Б/Н";
                     case "Year":
                         return year.ToString(format ?? "0000", CultureInfo.InvariantCulture);
                     case "Sequence":

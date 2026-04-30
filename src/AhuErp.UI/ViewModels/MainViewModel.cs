@@ -1,7 +1,9 @@
 using System;
 using System.Collections.ObjectModel;
+using System.Linq;
 using AhuErp.Core.Services;
 using AhuErp.UI.Converters;
+using AhuErp.UI.Infrastructure;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -15,6 +17,7 @@ namespace AhuErp.UI.ViewModels
     public partial class MainViewModel : ViewModelBase
     {
         private readonly IAuthService _auth;
+        private readonly RkkViewModel _rkkVm;
 
         public ObservableCollection<NavigationItem> NavigationItems { get; }
 
@@ -52,10 +55,17 @@ namespace AhuErp.UI.ViewModels
                              OrgStructureViewModel orgStructureVm,
                              SubstitutionsViewModel substitutionsVm,
                              MyDesktopViewModel myDesktopVm,
-                             INotificationService notifications)
+                             NotificationPrefsViewModel notificationPrefsVm,
+                             INotificationService notifications,
+                             IDocumentNavigator navigator = null)
         {
             _auth = auth ?? throw new ArgumentNullException(nameof(auth));
             _notifications = notifications ?? throw new ArgumentNullException(nameof(notifications));
+            _rkkVm = rkkVm;
+
+            // Регистрируемся в навигаторе документов, чтобы карточки и
+            // уведомления на «Моём рабочем столе» могли открывать РКК.
+            (navigator as DocumentNavigator)?.AttachMain(this);
 
             NavigationItems = new ObservableCollection<NavigationItem>
             {
@@ -74,6 +84,7 @@ namespace AhuErp.UI.ViewModels
                 new NavigationItem("Отчёты", RolePolicy.Reports, reportsVm),
                 new NavigationItem("Оргструктура", RolePolicy.OrgStructure, orgStructureVm),
                 new NavigationItem("Замещения", RolePolicy.Substitutions, substitutionsVm),
+                new NavigationItem("Уведомления (настройки)", RolePolicy.NotificationPrefs, notificationPrefsVm),
                 new NavigationItem("Журнал аудита", RolePolicy.AuditJournal, auditJournalVm),
             };
 
@@ -102,6 +113,26 @@ namespace AhuErp.UI.ViewModels
         }
 
         /// <summary>
+        /// Phase 9 / A9 — переключиться на вкладку РКК и выбрать документ
+        /// по идентификатору. Вызывается из «Моего рабочего стола» по
+        /// двойному клику на карточке/уведомлении.
+        /// </summary>
+        public void NavigateToDocument(int documentId)
+        {
+            var item = NavigationItems.FirstOrDefault(n =>
+                n.IsAllowed && n.ViewModel is RkkViewModel);
+            if (item == null) return;
+
+            SelectedNavigationItem = item;
+
+            if (_rkkVm == null) return;
+            if (_rkkVm.ReloadCommand.CanExecute(null))
+                _rkkVm.ReloadCommand.Execute(null);
+            var doc = _rkkVm.Documents.FirstOrDefault(d => d.Id == documentId);
+            if (doc != null) _rkkVm.SelectedDocument = doc;
+        }
+
+        /// <summary>
         /// Phase 9 — обновить счётчик непрочитанных в шапке. Дёргается
         /// DispatcherTimer-ом из <c>App.xaml.cs</c> + при ручной навигации.
         /// </summary>
@@ -112,10 +143,36 @@ namespace AhuErp.UI.ViewModels
         }
 
         [RelayCommand]
+        private void OpenMyDesktop()
+        {
+            var item = NavigationItems.FirstOrDefault(n =>
+                n.IsAllowed && n.ViewModel is MyDesktopViewModel);
+            if (item != null) SelectedNavigationItem = item;
+
+            // Принудительно перечитываем уведомления (счётчик в шапке + список
+            // на рабочем столе), чтобы открытие бейджем работало как «прочитать
+            // все непрочитанные».
+            if (item?.ViewModel is MyDesktopViewModel desk)
+            {
+                desk.Reload();
+            }
+            RefreshUnreadCount();
+        }
+
+        [RelayCommand]
         private void Logout()
         {
             _auth.Logout();
-            System.Windows.Application.Current.Shutdown();
+
+            // Закрываем главное окно и просим App перезапустить цикл
+            // login → main без выгрузки приложения. Полный Application.Shutdown
+            // выполняется только если пользователь не пройдёт повторный вход.
+            var mainWindow = System.Windows.Application.Current.MainWindow;
+            if (mainWindow != null)
+            {
+                mainWindow.Tag = "logout";
+                mainWindow.Close();
+            }
         }
 
         private void ApplyRolePolicy()

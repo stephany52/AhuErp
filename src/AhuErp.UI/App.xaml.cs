@@ -28,14 +28,22 @@ namespace AhuErp.UI
 
             AppServices.Initialize();
 
+            ShowLoginAndThenMain();
+        }
+
+        /// <summary>
+        /// Цикл «логин → главное окно». Если пользователь нажал «Выйти» в
+        /// шапке (MainViewModel.LogoutCommand ставит Tag="logout"), MainWindow
+        /// закрывается и мы заново показываем LoginWindow вместо <see cref="Shutdown()"/>.
+        /// </summary>
+        private void ShowLoginAndThenMain()
+        {
             var loginVm = AppServices.GetRequiredService<LoginViewModel>();
             var login = new LoginWindow(loginVm);
 
             // ShutdownMode=OnExplicitShutdown в App.xaml: WPF не закрывает приложение
             // сам, когда `Application.Windows` ненадолго становится пустым между
-            // закрытием LoginWindow и показом MainWindow. Иначе диспетчер успевает
-            // запланировать shutdown до того, как MainWindow создастся, и процесс
-            // выходит с кодом 0 без видимой ошибки. Закрытие выполняем явно ниже.
+            // закрытием LoginWindow и показом MainWindow.
             if (login.ShowDialog() != true)
             {
                 Shutdown();
@@ -45,7 +53,18 @@ namespace AhuErp.UI
             var mainVm = AppServices.GetRequiredService<MainViewModel>();
             var main = new MainWindow { DataContext = mainVm };
             MainWindow = main;
-            main.Closed += (_, __) => Shutdown();
+            main.Closed += (_, __) =>
+            {
+                if (string.Equals(main.Tag as string, "logout", StringComparison.Ordinal))
+                {
+                    // Перезапускаем цикл входа, не выгружая приложение.
+                    Dispatcher.BeginInvoke(new Action(ShowLoginAndThenMain));
+                }
+                else
+                {
+                    Shutdown();
+                }
+            };
             main.Show();
 
             // Phase 9 — раз в 60 секунд обходим активные задачи и создаём

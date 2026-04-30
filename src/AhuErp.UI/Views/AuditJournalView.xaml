@@ -56,8 +56,9 @@
                 <DataGridTextColumn Header="Действие" Binding="{Binding ActionType, Converter={StaticResource EnumDisplayConverter}}" Width="160" />
                 <DataGridTextColumn Header="Сущность" Binding="{Binding EntityType}" Width="120" />
                 <DataGridTextColumn Header="Id" Binding="{Binding EntityId}" Width="60" />
-                <DataGridTextColumn Header="Старое" Binding="{Binding OldValues}" Width="*" />
-                <DataGridTextColumn Header="Новое" Binding="{Binding NewValues}" Width="*" />
+                <DataGridTextColumn Header="Старое" Binding="{Binding OldValues, Converter={StaticResource AuditValuesConverter}}" Width="*" />
+                <DataGridTextColumn Header="Новое" Binding="{Binding NewValues, Converter={StaticResource AuditValuesConverter}}" Width="*" />
+                <DataGridTextColumn Header="Описание" Binding="{Binding Details, Converter={StaticResource AuditValuesConverter}}" Width="220" />
             </DataGrid.Columns>
         </DataGrid>
     </Grid>

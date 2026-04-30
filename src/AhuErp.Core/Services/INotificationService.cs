@@ -29,5 +29,22 @@ namespace AhuErp.Core.Services
         /// Повторный вызов в рамках того же события записей не дублирует.
         /// </summary>
         void TickReminders(DateTime now);
+
+        // Preferences (A11) -------------------------------------------------
+
+        /// <summary>
+        /// Все настройки уведомлений сотрудника. Если по типу нет записи —
+        /// действует умолчание (InApp + IsEnabled = true).
+        /// </summary>
+        IReadOnlyList<NotificationPreference> ListPreferences(int employeeId);
+
+        /// <summary>
+        /// Сохранить настройку уведомления для сотрудника. Если запись по
+        /// этому <see cref="NotificationKind"/> существует — обновится, иначе
+        /// будет создана новая.
+        /// </summary>
+        void SetPreference(int employeeId, NotificationKind kind,
+                           NotificationChannel channel, bool isEnabled,
+                           string emailOverride = null);
     }
 }

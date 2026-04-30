@@ -61,6 +61,9 @@
         <DataTemplate DataType="{x:Type vm:MyDesktopViewModel}">
             <views:MyDesktopView />
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:NotificationPrefsViewModel}">
+            <views:NotificationPrefsView />
+        </DataTemplate>
     </Window.Resources>
 
     <Grid>
@@ -114,13 +117,23 @@
                                        Foreground="{StaticResource Brush.Sidebar.Accent}"
                                        FontSize="11" Margin="0,2,0,0" />
                         </StackPanel>
-                        <!-- Phase 9 — индикатор непрочитанных уведомлений -->
-                        <Border Grid.Column="1" Background="#3B82F6" Padding="6,2" CornerRadius="10"
+                        <!-- Phase 9 — индикатор непрочитанных уведомлений (клик → «Мой рабочий стол»). -->
+                        <Button Grid.Column="1"
+                                Command="{Binding OpenMyDesktopCommand}"
                                 VerticalAlignment="Center" Margin="8,0,0,0"
-                                ToolTip="Непрочитанные уведомления">
+                                Cursor="Hand"
+                                ToolTip="Открыть Мой рабочий стол с непрочитанными уведомлениями"
+                                Background="Transparent" BorderThickness="0" Padding="0">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border Background="#3B82F6" Padding="8,2" CornerRadius="10">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Border>
+                                </ControlTemplate>
+                            </Button.Template>
                             <TextBlock Text="{Binding UnreadNotifications}" Foreground="White"
                                        FontWeight="Bold" FontSize="11" />
-                        </Border>
+                        </Button>
                     </Grid>
                 </Border>
 

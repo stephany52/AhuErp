@@ -11,6 +11,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
@@ -22,9 +23,26 @@
             <TextBlock Text="{Binding ErrorMessage}" Foreground="Red" VerticalAlignment="Center" TextWrapping="Wrap" />
         </StackPanel>
 
-        <Border Grid.Row="2" Background="White" Padding="12" CornerRadius="4">
+        <Border Grid.Row="2" Background="#F9FAFB" CornerRadius="4" Padding="8" Margin="0,0,0,8">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="Назначить руководителя выбранному отделу:" VerticalAlignment="Center" Margin="0,0,8,0" />
+                <ComboBox ItemsSource="{Binding Employees}"
+                          SelectedItem="{Binding NewHead}"
+                          DisplayMemberPath="FullName"
+                          IsEditable="True"
+                          IsTextSearchEnabled="True"
+                          TextSearch.TextPath="FullName"
+                          MinWidth="260" Padding="6" Margin="0,0,8,0" />
+                <Button Content="Назначить"
+                        Command="{Binding AssignHeadCommand}"
+                        Padding="10,4" />
+            </StackPanel>
+        </Border>
+
+        <Border Grid.Row="3" Background="White" Padding="12" CornerRadius="4">
             <TreeView ItemsSource="{Binding Roots}"
-                      SelectedValuePath="Id">
+                      SelectedValuePath="Id"
+                      SelectedItemChanged="TreeView_SelectedItemChanged">
                 <TreeView.Resources>
                     <HierarchicalDataTemplate DataType="{x:Type vm:DepartmentNode}"
                                               ItemsSource="{Binding Children}">

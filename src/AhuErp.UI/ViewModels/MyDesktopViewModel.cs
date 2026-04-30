@@ -3,6 +3,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using AhuErp.Core.Models;
 using AhuErp.Core.Services;
+using AhuErp.UI.Infrastructure;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -20,6 +21,7 @@ namespace AhuErp.UI.ViewModels
         private readonly IApprovalService _approvalService;
         private readonly INotificationService _notifications;
         private readonly ISubstitutionService _substitutions;
+        private readonly IDocumentNavigator _navigator;
 
         public ObservableCollection<DocumentTask> Tasks { get; } = new ObservableCollection<DocumentTask>();
         public ObservableCollection<DocumentApproval> Approvals { get; } = new ObservableCollection<DocumentApproval>();
@@ -39,15 +41,34 @@ namespace AhuErp.UI.ViewModels
             ITaskService taskService,
             IApprovalService approvalService,
             INotificationService notifications,
-            ISubstitutionService substitutions)
+            ISubstitutionService substitutions,
+            IDocumentNavigator navigator = null)
         {
             _auth = auth ?? throw new ArgumentNullException(nameof(auth));
             _taskService = taskService ?? throw new ArgumentNullException(nameof(taskService));
             _approvalService = approvalService ?? throw new ArgumentNullException(nameof(approvalService));
             _notifications = notifications ?? throw new ArgumentNullException(nameof(notifications));
             _substitutions = substitutions ?? throw new ArgumentNullException(nameof(substitutions));
+            _navigator = navigator;
 
             Reload();
+        }
+
+        /// <summary>
+        /// Открыть РКК документа, к которому привязана выбранная карточка
+        /// (поручение или уведомление). Никаких действий, если кросс-VM
+        /// навигатор не зарегистрирован или у объекта нет связи с документом.
+        /// </summary>
+        [RelayCommand]
+        public void OpenDocument(object payload)
+        {
+            if (_navigator == null) return;
+            int? docId = null;
+            if (payload is DocumentTask task) docId = task.DocumentId;
+            else if (payload is Notification n) docId = n.RelatedDocumentId;
+            else if (payload is DocumentApproval a) docId = a.DocumentId;
+            if (docId.HasValue && docId.Value > 0)
+                _navigator.OpenDocument(docId.Value);
         }
 
         [RelayCommand]

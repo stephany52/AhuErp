@@ -1,8 +1,10 @@
 using System;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Linq;
 using AhuErp.Core.Models;
 using AhuErp.Core.Services;
+using AhuErp.UI.Infrastructure;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -27,6 +29,8 @@ namespace AhuErp.UI.ViewModels
         private readonly IFleetService _fleet;
         private readonly IVehicleRepository _vehicleRepo;
         private readonly ISignatureService _signatures;
+        private readonly IEmployeeRepository _employeeRepo;
+        private readonly IFileDialogService _fileDialog;
 
         public ObservableCollection<Document> Documents { get; }
             = new ObservableCollection<Document>();
@@ -51,6 +55,48 @@ namespace AhuErp.UI.ViewModels
 
         public ObservableCollection<DocumentSignature> Signatures { get; }
             = new ObservableCollection<DocumentSignature>();
+
+        public ObservableCollection<Employee> Employees { get; }
+            = new ObservableCollection<Employee>();
+
+        public ObservableCollection<ApprovalRouteTemplate> RouteTemplates { get; }
+            = new ObservableCollection<ApprovalRouteTemplate>();
+
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(StartApprovalRouteCommand))]
+        private ApprovalRouteTemplate selectedRouteTemplate;
+
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(AddAttachmentVersionCommand))]
+        [NotifyCanExecuteChangedFor(nameof(OpenAttachmentCommand))]
+        private DocumentAttachment selectedAttachment;
+
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(CompleteTaskCommand))]
+        [NotifyCanExecuteChangedFor(nameof(CancelTaskCommand))]
+        [NotifyCanExecuteChangedFor(nameof(ReassignTaskCommand))]
+        private DocumentTask selectedTask;
+
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(ReassignTaskCommand))]
+        private Employee reassignTaskExecutor;
+
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(ApproveCommand))]
+        [NotifyCanExecuteChangedFor(nameof(RejectCommand))]
+        [NotifyCanExecuteChangedFor(nameof(CommentApprovalCommand))]
+        private DocumentApproval selectedApproval;
+
+        [ObservableProperty]
+        private string approvalComment;
+
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(CancelInventoryWriteOffCommand))]
+        private InventoryTransaction selectedInventoryTx;
+
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(CancelVehicleTripCommand))]
+        private VehicleTrip selectedTrip;
 
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(SignSimpleCommand))]
@@ -155,7 +201,7 @@ namespace AhuErp.UI.ViewModels
 
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(AddTaskCommand))]
-        private int newTaskExecutorId;
+        private Employee newTaskExecutor;
 
         [ObservableProperty]
         private string errorMessage;
@@ -172,7 +218,9 @@ namespace AhuErp.UI.ViewModels
             IInventoryRepository inventoryRepo,
             IFleetService fleet,
             IVehicleRepository vehicleRepo,
-            ISignatureService signatures = null)
+            ISignatureService signatures = null,
+            IEmployeeRepository employeeRepo = null,
+            IFileDialogService fileDialog = null)
         {
             _documents = documents ?? throw new ArgumentNullException(nameof(documents));
             _nomenclature = nomenclature ?? throw new ArgumentNullException(nameof(nomenclature));
@@ -186,6 +234,8 @@ namespace AhuErp.UI.ViewModels
             _fleet = fleet ?? throw new ArgumentNullException(nameof(fleet));
             _vehicleRepo = vehicleRepo ?? throw new ArgumentNullException(nameof(vehicleRepo));
             _signatures = signatures;
+            _employeeRepo = employeeRepo;
+            _fileDialog = fileDialog;
 
             Reload();
         }
@@ -227,6 +277,16 @@ namespace AhuErp.UI.ViewModels
             Vehicles.Clear();
             foreach (var v in _vehicleRepo.ListVehicles().OrderBy(v => v.LicensePlate))
                 Vehicles.Add(v);
+            Employees.Clear();
+            if (_employeeRepo != null)
+            {
+                foreach (var e in _employeeRepo.ListAll().OrderBy(e => e.FullName))
+                    Employees.Add(e);
+            }
+            RouteTemplates.Clear();
+            foreach (var rt in _approvals.ListTemplates(activeOnly: true)
+                                          .OrderBy(t => t.Name))
+                RouteTemplates.Add(rt);
             Documents.Clear();
             // Загружаем все «офисные» направления документов.
             foreach (var d in _documents.ListByType(DocumentType.Internal)
@@ -323,10 +383,11 @@ namespace AhuErp.UI.ViewModels
                 _tasksService.CreateTask(
                     SelectedDocument.Id,
                     authorId: actor,
-                    executorId: NewTaskExecutorId,
+                    executorId: NewTaskExecutor?.Id ?? 0,
                     description: NewTaskDescription,
                     deadline: NewTaskDeadline.Date.AddDays(1).AddSeconds(-1));
                 NewTaskDescription = null;
+                NewTaskExecutor = null;
                 ReloadTasks();
                 ReloadHistory();
             }
@@ -617,6 +678,260 @@ namespace AhuErp.UI.ViewModels
         private bool CanRegister() => SelectedDocument != null && !SelectedDocument.IsRegistered;
         private bool CanAddTask() => SelectedDocument != null
             && !string.IsNullOrWhiteSpace(NewTaskDescription)
-            && NewTaskExecutorId > 0;
+            && NewTaskExecutor != null;
+
+        // ── A4: Поручения — операции с выбранной задачей ──────────────────
+
+        private bool IsTaskMutable(DocumentTask t) =>
+            t != null && t.Status != DocumentTaskStatus.Completed
+                      && t.Status != DocumentTaskStatus.Cancelled;
+
+        private bool CanCompleteTask() => IsTaskMutable(SelectedTask);
+        private bool CanCancelTask() => IsTaskMutable(SelectedTask);
+        private bool CanReassignTask() => IsTaskMutable(SelectedTask)
+            && ReassignTaskExecutor != null;
+
+        [RelayCommand(CanExecute = nameof(CanCompleteTask))]
+        private void CompleteTask()
+        {
+            ErrorMessage = null;
+            try
+            {
+                var actor = _auth.CurrentEmployee?.Id ?? 0;
+                _tasksService.UpdateStatus(SelectedTask.Id, DocumentTaskStatus.Completed, actor,
+                    reportText: "Отметка о выполнении из РКК.");
+                ReloadTasks();
+                ReloadHistory();
+            }
+            catch (Exception ex) { ErrorMessage = ex.Message; }
+        }
+
+        [RelayCommand(CanExecute = nameof(CanCancelTask))]
+        private void CancelTask()
+        {
+            ErrorMessage = null;
+            try
+            {
+                var actor = _auth.CurrentEmployee?.Id ?? 0;
+                _tasksService.UpdateStatus(SelectedTask.Id, DocumentTaskStatus.Cancelled, actor,
+                    reportText: "Отмена поручения из РКК.");
+                ReloadTasks();
+                ReloadHistory();
+            }
+            catch (Exception ex) { ErrorMessage = ex.Message; }
+        }
+
+        [RelayCommand(CanExecute = nameof(CanReassignTask))]
+        private void ReassignTask()
+        {
+            ErrorMessage = null;
+            try
+            {
+                var actor = _auth.CurrentEmployee?.Id ?? 0;
+                _tasksService.Reassign(SelectedTask.Id, ReassignTaskExecutor.Id, actor,
+                    reason: "Переназначение из РКК.");
+                ReassignTaskExecutor = null;
+                ReloadTasks();
+                ReloadHistory();
+            }
+            catch (Exception ex) { ErrorMessage = ex.Message; }
+        }
+
+        // ── A3: Вложения — загрузка / новая версия / открытие ─────────────
+
+        [RelayCommand(CanExecute = nameof(HasSelectedDocument))]
+        private void AddAttachment()
+        {
+            ErrorMessage = null;
+            try
+            {
+                if (_fileDialog == null)
+                {
+                    ErrorMessage = "Диалог выбора файла недоступен.";
+                    return;
+                }
+                var path = _fileDialog.PromptOpenFile(
+                    "Загрузить вложение",
+                    "Все файлы (*.*)|*.*");
+                if (string.IsNullOrEmpty(path)) return;
+
+                var actor = _auth.CurrentEmployee?.Id ?? 0;
+                using (var stream = File.OpenRead(path))
+                {
+                    _attachments.Upload(SelectedDocument.Id, stream,
+                        Path.GetFileName(path), actor);
+                }
+                ReloadAttachments();
+                ReloadHistory();
+            }
+            catch (Exception ex) { ErrorMessage = ex.Message; }
+        }
+
+        private bool CanAddAttachmentVersion() =>
+            SelectedAttachment != null && _fileDialog != null;
+
+        [RelayCommand(CanExecute = nameof(CanAddAttachmentVersion))]
+        private void AddAttachmentVersion()
+        {
+            ErrorMessage = null;
+            try
+            {
+                var path = _fileDialog.PromptOpenFile(
+                    $"Новая версия «{SelectedAttachment.FileName}»",
+                    "Все файлы (*.*)|*.*");
+                if (string.IsNullOrEmpty(path)) return;
+
+                var actor = _auth.CurrentEmployee?.Id ?? 0;
+                using (var stream = File.OpenRead(path))
+                {
+                    _attachments.AddVersion(SelectedAttachment.AttachmentGroupId,
+                        stream, Path.GetFileName(path), actor);
+                }
+                ReloadAttachments();
+                ReloadHistory();
+            }
+            catch (Exception ex) { ErrorMessage = ex.Message; }
+        }
+
+        private bool CanOpenAttachment() =>
+            SelectedAttachment != null && _fileDialog != null;
+
+        [RelayCommand(CanExecute = nameof(CanOpenAttachment))]
+        private void OpenAttachment()
+        {
+            ErrorMessage = null;
+            try
+            {
+                var actor = _auth.CurrentEmployee?.Id ?? 0;
+                var savePath = _fileDialog.PromptSaveFile(
+                    "Сохранить копию вложения",
+                    "Все файлы (*.*)|*.*",
+                    SelectedAttachment.FileName);
+                if (string.IsNullOrEmpty(savePath)) return;
+
+                using (var src = _attachments.Open(SelectedAttachment.Id, actor))
+                using (var dst = File.Create(savePath))
+                {
+                    src.CopyTo(dst);
+                }
+                ReloadHistory();
+            }
+            catch (Exception ex) { ErrorMessage = ex.Message; }
+        }
+
+        // ── A5: Согласование — запуск маршрута и решения ─────────────────
+
+        private bool CanStartApprovalRoute() =>
+            SelectedDocument != null
+            && SelectedRouteTemplate != null
+            && Approvals.Count == 0;
+
+        [RelayCommand(CanExecute = nameof(CanStartApprovalRoute))]
+        private void StartApprovalRoute()
+        {
+            ErrorMessage = null;
+            try
+            {
+                var actor = _auth.CurrentEmployee?.Id ?? 0;
+                _approvals.StartApproval(SelectedDocument.Id, SelectedRouteTemplate.Id, actor);
+                ReloadApprovals();
+                ReloadHistory();
+            }
+            catch (Exception ex) { ErrorMessage = ex.Message; }
+        }
+
+        private bool CanDecide(ApprovalDecision _) =>
+            SelectedApproval != null
+            && SelectedApproval.Decision == ApprovalDecision.Pending
+            && _auth.CurrentEmployee != null
+            && SelectedApproval.ApproverId == _auth.CurrentEmployee.Id;
+
+        private bool CanApprove() => CanDecide(ApprovalDecision.Approved);
+        private bool CanReject() => CanDecide(ApprovalDecision.Rejected);
+        private bool CanCommentApproval() => CanDecide(ApprovalDecision.Comments);
+
+        [RelayCommand(CanExecute = nameof(CanApprove))]
+        private void Approve() => ApplyDecision(ApprovalDecision.Approved);
+
+        [RelayCommand(CanExecute = nameof(CanReject))]
+        private void Reject() => ApplyDecision(ApprovalDecision.Rejected);
+
+        [RelayCommand(CanExecute = nameof(CanCommentApproval))]
+        private void CommentApproval() => ApplyDecision(ApprovalDecision.Comments);
+
+        private void ApplyDecision(ApprovalDecision decision)
+        {
+            ErrorMessage = null;
+            try
+            {
+                var actor = _auth.CurrentEmployee.Id;
+                _approvals.ApplyDecision(SelectedApproval.Id, decision, actor,
+                    string.IsNullOrWhiteSpace(ApprovalComment) ? null : ApprovalComment);
+                ApprovalComment = null;
+                ReloadApprovals();
+                ReloadHistory();
+            }
+            catch (Exception ex) { ErrorMessage = ex.Message; }
+        }
+
+        // ── A6: Отмена связанных операций ─────────────────────────────────
+
+        private bool CanCancelRelatedOp()
+        {
+            var role = _auth.CurrentEmployee?.Role;
+            return role.HasValue && RolePolicy.CanCancelRelatedOperation(role.Value);
+        }
+
+        private bool CanCancelInventoryWriteOff()
+        {
+            if (SelectedInventoryTx == null) return false;
+            // Отмена допускается только для расходных операций, привязанных к
+            // текущей карточке. Компенсация делается одной зеркальной транзакцией.
+            return SelectedInventoryTx.QuantityChanged < 0
+                   && SelectedInventoryTx.BasisDocumentId == SelectedDocument?.Id
+                   && CanCancelRelatedOp();
+        }
+
+        [RelayCommand(CanExecute = nameof(CanCancelInventoryWriteOff))]
+        private void CancelInventoryWriteOff()
+        {
+            ErrorMessage = null;
+            try
+            {
+                var actor = _auth.CurrentEmployee.Id;
+                var compensating = _inventory.ProcessTransaction(
+                    SelectedInventoryTx.InventoryItemId,
+                    -SelectedInventoryTx.QuantityChanged,
+                    SelectedDocument.Id,
+                    actor);
+                _audit.Record(AuditActionType.Deleted, nameof(InventoryTransaction),
+                    SelectedInventoryTx.Id, actor,
+                    newValues: $"Отменено компенсирующей транзакцией #{compensating.Id};Qty={-SelectedInventoryTx.QuantityChanged}");
+                ReloadRelatedOps();
+                ReloadHistory();
+            }
+            catch (Exception ex) { ErrorMessage = ex.Message; }
+        }
+
+        private bool CanCancelVehicleTrip() =>
+            SelectedTrip != null
+            && SelectedTrip.BasisDocumentId == SelectedDocument?.Id
+            && CanCancelRelatedOp();
+
+        [RelayCommand(CanExecute = nameof(CanCancelVehicleTrip))]
+        private void CancelVehicleTrip()
+        {
+            ErrorMessage = null;
+            try
+            {
+                var actor = _auth.CurrentEmployee.Id;
+                var trip = _fleet.CancelTrip(SelectedTrip.Id, actor, "Отмена из РКК.");
+                _audit.Record(AuditActionType.Deleted, nameof(VehicleTrip), trip.Id, actor,
+                    newValues: $"Отмена путевого листа #{trip.Id};Vehicle={trip.VehicleId}");
+                ReloadRelatedOps();
+                ReloadHistory();
+            }
+            catch (Exception ex) { ErrorMessage = ex.Message; }
+        }
     }
 }

@@ -136,6 +136,8 @@ namespace AhuErp.UI.Infrastructure
 
             // UI-инфраструктура
             services.AddSingleton<IFileDialogService, FileDialogService>();
+            services.AddSingleton<DocumentNavigator>();
+            services.AddSingleton<IDocumentNavigator>(sp => sp.GetRequiredService<DocumentNavigator>());
 
             // ViewModels — transient, чтобы получать свежее состояние при навигации.
             services.AddTransient<LoginViewModel>();
@@ -156,6 +158,7 @@ namespace AhuErp.UI.Infrastructure
             services.AddTransient<OrgStructureViewModel>();
             services.AddTransient<SubstitutionsViewModel>();
             services.AddTransient<MyDesktopViewModel>();
+            services.AddTransient<NotificationPrefsViewModel>();
         }
     }
 }

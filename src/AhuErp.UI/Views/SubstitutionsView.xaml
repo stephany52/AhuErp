@@ -65,7 +65,7 @@
                 <DataGridTextColumn Header="Заместитель" Binding="{Binding SubstituteEmployee.FullName}" Width="*" />
                 <DataGridTextColumn Header="С" Binding="{Binding From, StringFormat=dd.MM.yyyy}" Width="100" />
                 <DataGridTextColumn Header="По" Binding="{Binding To, StringFormat=dd.MM.yyyy}" Width="100" />
-                <DataGridTextColumn Header="Область" Binding="{Binding Scope}" Width="120" />
+                <DataGridTextColumn Header="Область" Binding="{Binding Scope, Converter={StaticResource EnumDisplayConverter}}" Width="180" />
                 <DataGridCheckBoxColumn Header="Активно" Binding="{Binding IsActive}" Width="80" />
                 <DataGridTextColumn Header="Причина" Binding="{Binding Reason}" Width="*" />
                 <DataGridTemplateColumn Header="Действия" Width="120">

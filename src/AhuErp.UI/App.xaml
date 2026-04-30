@@ -9,6 +9,7 @@
             <conv:StringToVisibilityConverter  x:Key="StringToVisibilityConverter" />
             <conv:OverdueRowColorConverter     x:Key="OverdueRowColorConverter" />
             <conv:EnumDisplayConverter         x:Key="EnumDisplayConverter" />
+            <conv:AuditValuesConverter         x:Key="AuditValuesConverter" />
 
             <!-- Шаблон элемента ComboBox, отображающий enum через локализующий конвертер.
                  Используется через ItemTemplate="{StaticResource EnumComboBoxItemTemplate}"

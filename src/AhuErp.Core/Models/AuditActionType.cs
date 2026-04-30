@@ -46,6 +46,7 @@ namespace AhuErp.Core.Models
         SubstitutionCreated = 80,
         SubstitutionCancelled = 81,
         TaskDelegated = 82,
+        DepartmentHeadAssigned = 83,
 
         // Phase 10 / 12 — поиск и регламентированная отчётность.
         IndexRebuilt = 85,

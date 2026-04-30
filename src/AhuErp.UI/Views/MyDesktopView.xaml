@@ -35,17 +35,22 @@
         </Border>
 
         <TabControl Grid.Row="2" Grid.Column="0" Margin="0,8,12,0">
-            <TabItem Header="Поручения">
+            <TabItem Header="Назначены мне">
                 <DataGrid ItemsSource="{Binding Tasks}"
                           AutoGenerateColumns="False"
                           CanUserAddRows="False" CanUserDeleteRows="False"
                           IsReadOnly="True">
+                    <DataGrid.InputBindings>
+                        <MouseBinding MouseAction="LeftDoubleClick"
+                                      Command="{Binding DataContext.OpenDocumentCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                      CommandParameter="{Binding SelectedItem, RelativeSource={RelativeSource AncestorType=DataGrid}}" />
+                    </DataGrid.InputBindings>
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="#" Binding="{Binding Id}" Width="60" />
                         <DataGridTextColumn Header="Документ" Binding="{Binding Document.Title}" Width="*" />
                         <DataGridTextColumn Header="Описание" Binding="{Binding Description}" Width="2*" />
                         <DataGridTextColumn Header="Срок" Binding="{Binding Deadline, StringFormat=dd.MM.yyyy HH:mm}" Width="140" />
-                        <DataGridTextColumn Header="Статус" Binding="{Binding Status}" Width="120" />
+                        <DataGridTextColumn Header="Статус" Binding="{Binding Status, Converter={StaticResource EnumDisplayConverter}}" Width="120" />
                     </DataGrid.Columns>
                 </DataGrid>
             </TabItem>
@@ -67,7 +72,13 @@
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
                                 <Border BorderBrush="#E0E0E0" BorderThickness="0,0,0,1"
-                                        Padding="6,8" Margin="0,0,0,4">
+                                        Padding="6,8" Margin="0,0,0,4"
+                                        Cursor="Hand">
+                                    <Border.InputBindings>
+                                        <MouseBinding MouseAction="LeftDoubleClick"
+                                                      Command="{Binding DataContext.OpenDocumentCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                      CommandParameter="{Binding}" />
+                                    </Border.InputBindings>
                                     <StackPanel>
                                         <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
                                         <TextBlock Text="{Binding Body}" TextWrapping="Wrap" Foreground="#333" />
