@@ -108,6 +108,7 @@ namespace AhuErp.UI.ViewModels
                 case DocumentTaskStatus.OnReview: return "На проверке";
                 case DocumentTaskStatus.Completed: return "Выполнено";
                 case DocumentTaskStatus.Cancelled: return "Отменено";
+                case DocumentTaskStatus.Overdue: return "Просрочено";
                 default: return status.ToString();
             }
         }

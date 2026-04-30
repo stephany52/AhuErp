@@ -5,22 +5,22 @@ namespace AhuErp.Core.Migrations
     using System.Data.Entity.Migrations;
     using System.Data.Entity.Migrations.Infrastructure;
     using System.Resources;
-
+    
     [GeneratedCode("EntityFramework.Migrations", "6.4.4")]
     public sealed partial class AddInventoryItemUnitAndMinimumBalance : IMigrationMetadata
     {
         private readonly ResourceManager Resources = new ResourceManager(typeof(AddInventoryItemUnitAndMinimumBalance));
-
+        
         string IMigrationMetadata.Id
         {
-            get { return "20260430201500_AddInventoryItemUnitAndMinimumBalance"; }
+            get { return "202604302024306_AddInventoryItemUnitAndMinimumBalance"; }
         }
-
+        
         string IMigrationMetadata.Source
         {
             get { return null; }
         }
-
+        
         string IMigrationMetadata.Target
         {
             get { return Resources.GetString("Target"); }
