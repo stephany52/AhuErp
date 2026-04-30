@@ -123,21 +123,26 @@ namespace AhuErp.UI.Converters
         private static string TranslateFreeText(string text)
         {
             if (string.IsNullOrWhiteSpace(text)) return text;
-            var translated = text
-                .Replace("AttachmentTextIndices", "индекса вложений")
-                .Replace("DocumentApproval", "согласование")
-                .Replace("DocumentResolution", "резолюция")
-                .Replace("DocumentTypeRef", "вид документа")
-                .Replace("DocumentTask", "поручение")
-                .Replace("Document", "документ")
-                .Replace("NomenclatureCase", "дело номенклатуры")
-                .Replace("InventoryTransaction", "движение ТМЦ")
-                .Replace("VehicleTrip", "путевой лист")
-                .Replace("Created", "создано")
-                .Replace("Updated", "изменено")
-                .Replace("Deleted", "удалено");
-            return ValueMap.TryGetValue(translated, out var v) ? v : translated;
+            if (EntityMap.TryGetValue(text, out var entity)) return entity;
+            if (ValueMap.TryGetValue(text, out var value)) return value;
+            return text;
         }
+
+        private static readonly IReadOnlyDictionary<string, string> EntityMap =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["AttachmentTextIndices"] = "индекс вложений",
+                ["Document"] = "документ",
+                ["DocumentApproval"] = "согласование",
+                ["DocumentAttachment"] = "вложение",
+                ["DocumentResolution"] = "резолюция",
+                ["DocumentSignature"] = "подпись",
+                ["DocumentTask"] = "поручение",
+                ["DocumentTypeRef"] = "вид документа",
+                ["InventoryTransaction"] = "движение ТМЦ",
+                ["NomenclatureCase"] = "дело номенклатуры",
+                ["VehicleTrip"] = "путевой лист"
+            };
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
             => throw new NotSupportedException();

@@ -126,8 +126,6 @@ namespace AhuErp.UI.ViewModels
                     Model = NewVehicleModel?.Trim(),
                     CurrentStatus = NewVehicleStatus
                 });
-                if (!string.IsNullOrWhiteSpace(NewVehicleDriverName))
-                    DriverName = NewVehicleDriverName.Trim();
                 StatusMessage = $"Добавлено ТС {NewVehicleLicensePlate}.";
                 NewVehicleLicensePlate = null;
                 NewVehicleModel = null;
