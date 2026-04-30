@@ -23,6 +23,7 @@ namespace AhuErp.UI.ViewModels
         private readonly IAuthService _auth;
         private readonly IReportService _reports;
         private readonly IFileDialogService _fileDialog;
+        private readonly IEmployeeRepository _employees;
 
         public ObservableCollection<InventoryItem> Items { get; }
 
@@ -71,7 +72,8 @@ namespace AhuErp.UI.ViewModels
                                   IDocumentRepository documents,
                                   IAuthService auth,
                                   IReportService reports,
-                                  IFileDialogService fileDialog)
+                                  IFileDialogService fileDialog,
+                                  IEmployeeRepository employees)
         {
             _inventory = inventory ?? throw new ArgumentNullException(nameof(inventory));
             _inventoryService = inventoryService ?? throw new ArgumentNullException(nameof(inventoryService));
@@ -79,6 +81,7 @@ namespace AhuErp.UI.ViewModels
             _auth = auth ?? throw new ArgumentNullException(nameof(auth));
             _reports = reports ?? throw new ArgumentNullException(nameof(reports));
             _fileDialog = fileDialog ?? throw new ArgumentNullException(nameof(fileDialog));
+            _employees = employees ?? throw new ArgumentNullException(nameof(employees));
 
             Items = new ObservableCollection<InventoryItem>();
             EligibleDocuments = new ObservableCollection<Document>();
@@ -211,7 +214,11 @@ namespace AhuErp.UI.ViewModels
 
             RecentTransactions.Clear();
             foreach (var tx in _inventory.ListTransactions().Take(20))
+            {
+                if (tx.Initiator == null && tx.InitiatorId > 0)
+                    tx.Initiator = _employees.GetById(tx.InitiatorId);
                 RecentTransactions.Add(tx);
+            }
 
             SelectedItem = Items.FirstOrDefault(i => i.Id == itemId) ?? Items.FirstOrDefault();
             SelectedDocument = EligibleDocuments.FirstOrDefault(d => d.Id == docId);

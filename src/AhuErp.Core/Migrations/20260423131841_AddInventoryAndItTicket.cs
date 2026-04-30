@@ -14,8 +14,6 @@ namespace AhuErp.Core.Migrations
                         Id = c.Int(nullable: false, identity: true),
                         Name = c.String(nullable: false, maxLength: 256),
                         Category = c.Int(nullable: false),
-                        Unit = c.String(maxLength: 32),
-                        MinimumBalance = c.Int(nullable: false),
                         TotalQuantity = c.Int(nullable: false),
                     })
                 .PrimaryKey(t => t.Id);

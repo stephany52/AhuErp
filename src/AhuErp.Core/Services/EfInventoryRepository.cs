@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Data.Entity;
 using System.Linq;
 using AhuErp.Core.Data;
 using AhuErp.Core.Models;
@@ -28,7 +29,8 @@ namespace AhuErp.Core.Services
 
         public IReadOnlyList<InventoryTransaction> ListTransactions(int? itemId = null)
         {
-            IQueryable<InventoryTransaction> q = _ctx.InventoryTransactions;
+            IQueryable<InventoryTransaction> q = _ctx.InventoryTransactions
+                .Include(t => t.Initiator);
             if (itemId.HasValue)
             {
                 q = q.Where(t => t.InventoryItemId == itemId.Value);
