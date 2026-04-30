@@ -27,6 +27,41 @@
             <DockPanel Grid.Column="0">
                 <TextBlock Text="Транспортные средства"
                            FontWeight="SemiBold" DockPanel.Dock="Top" Margin="0,0,0,6" />
+                <Expander Header="Добавить ТС" DockPanel.Dock="Top" Margin="0,0,0,8">
+                    <Grid Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <StackPanel Grid.Column="0" Margin="0,0,6,6">
+                            <TextBlock Text="Госномер" />
+                            <TextBox Text="{Binding NewVehicleLicensePlate, UpdateSourceTrigger=PropertyChanged}" Padding="6" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Margin="0,0,0,6">
+                            <TextBlock Text="Модель" />
+                            <TextBox Text="{Binding NewVehicleModel, UpdateSourceTrigger=PropertyChanged}" Padding="6" />
+                        </StackPanel>
+                        <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,6,6">
+                            <TextBlock Text="Статус" />
+                            <ComboBox ItemsSource="{Binding VehicleStatuses}"
+                                      SelectedItem="{Binding NewVehicleStatus}"
+                                      ItemTemplate="{StaticResource EnumComboBoxItemTemplate}"
+                                      Padding="6" />
+                        </StackPanel>
+                        <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,0,0,6">
+                            <TextBlock Text="Водитель по умолчанию" />
+                            <TextBox Text="{Binding NewVehicleDriverName, UpdateSourceTrigger=PropertyChanged}" Padding="6" />
+                        </StackPanel>
+                        <Button Grid.Row="2" Grid.ColumnSpan="2" Content="Добавить ТС"
+                                Command="{Binding AddVehicleCommand}" Padding="8,6" />
+                    </Grid>
+                </Expander>
                 <DataGrid ItemsSource="{Binding Vehicles}"
                           SelectedItem="{Binding SelectedVehicle, UpdateSourceTrigger=PropertyChanged}"
                           AutoGenerateColumns="False"

@@ -182,6 +182,9 @@ namespace AhuErp.Core.Services
         public IReadOnlyList<DocumentTask> ListByDocument(int documentId)
             => _tasks.ListByDocument(documentId);
 
+        public IReadOnlyList<DocumentResolution> ListResolutionsByAuthor(int authorId)
+            => _tasks.ListResolutionsByAuthor(authorId);
+
         public IReadOnlyList<DocumentTask> ListMyTasks(int employeeId, MyTasksScope scope = MyTasksScope.AsExecutor)
         {
             switch (scope)

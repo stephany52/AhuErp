@@ -41,6 +41,15 @@ namespace AhuErp.UI.ViewModels
         [ObservableProperty]
         private string errorMessage;
 
+        public string SelectedTaskInfo
+        {
+            get
+            {
+                if (SelectedTask == null) return "Выберите поручение, чтобы изменить статус.";
+                return $"Статус: {EnumDisplay(SelectedTask.Status)}; срок: {SelectedTask.Deadline:dd.MM.yyyy HH:mm}.";
+            }
+        }
+
         public MyTasksViewModel(ITaskService tasks, IAuthService auth)
         {
             _tasks = tasks ?? throw new ArgumentNullException(nameof(tasks));
@@ -87,5 +96,21 @@ namespace AhuErp.UI.ViewModels
         }
 
         private bool HasSelection() => SelectedTask != null;
+
+        partial void OnSelectedTaskChanged(DocumentTask value) => OnPropertyChanged(nameof(SelectedTaskInfo));
+
+        private static string EnumDisplay(DocumentTaskStatus status)
+        {
+            switch (status)
+            {
+                case DocumentTaskStatus.New: return "Новое";
+                case DocumentTaskStatus.InProgress: return "В работе";
+                case DocumentTaskStatus.OnReview: return "На проверке";
+                case DocumentTaskStatus.Completed: return "Выполнено";
+                case DocumentTaskStatus.Cancelled: return "Отменено";
+                case DocumentTaskStatus.Overdue: return "Просрочено";
+                default: return status.ToString();
+            }
+        }
     }
 }

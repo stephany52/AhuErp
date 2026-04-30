@@ -17,6 +17,11 @@ namespace AhuErp.Core.Models
 
         public InventoryCategory Category { get; set; }
 
+        [StringLength(32)]
+        public string Unit { get; set; }
+
+        public int MinimumBalance { get; set; }
+
         /// <summary>Текущий остаток (в штуках).</summary>
         public int TotalQuantity { get; set; }
 

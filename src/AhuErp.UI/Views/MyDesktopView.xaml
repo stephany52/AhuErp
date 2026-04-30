@@ -55,12 +55,71 @@
                 </DataGrid>
             </TabItem>
             <TabItem Header="На согласовании у меня">
-                <TextBlock Margin="12" Foreground="Gray"
-                           Text="Список согласований доступен в разделе РКК документа. В Phase 12 здесь появится отдельный API." />
+                <DockPanel Margin="8">
+                    <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+                        <TextBlock Text="Статус:" VerticalAlignment="Center" Margin="0,0,6,0" />
+                        <ComboBox ItemsSource="{Binding ApprovalStatuses}"
+                                  SelectedItem="{Binding SelectedApprovalStatus}"
+                                  ItemTemplate="{StaticResource EnumComboBoxItemTemplate}"
+                                  MinWidth="150" Padding="6" />
+                    </StackPanel>
+                    <DataGrid ItemsSource="{Binding Approvals}"
+                              AutoGenerateColumns="False"
+                              CanUserAddRows="False" CanUserDeleteRows="False"
+                              IsReadOnly="True">
+                        <DataGrid.InputBindings>
+                            <MouseBinding MouseAction="LeftDoubleClick"
+                                          Command="{Binding DataContext.OpenDocumentCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                          CommandParameter="{Binding SelectedItem, RelativeSource={RelativeSource AncestorType=DataGrid}}" />
+                        </DataGrid.InputBindings>
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Документ" Binding="{Binding Document.Title}" Width="*" />
+                            <DataGridTextColumn Header="Этап" Binding="{Binding Order}" Width="60" />
+                            <DataGridTextColumn Header="Решение" Binding="{Binding Decision, Converter={StaticResource EnumDisplayConverter}}" Width="120" />
+                            <DataGridTextColumn Header="Дата решения" Binding="{Binding DecisionDate, StringFormat=dd.MM.yyyy HH:mm}" Width="140" />
+                            <DataGridTextColumn Header="Комментарий" Binding="{Binding Comment}" Width="*" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
             </TabItem>
             <TabItem Header="Резолюции от меня">
-                <TextBlock Margin="12" Foreground="Gray"
-                           Text="Список резолюций будет добавлен в Phase 12 вместе с отчётом по исполнительской дисциплине." />
+                <DockPanel Margin="8">
+                    <Border DockPanel.Dock="Top" Background="#F9FAFB" CornerRadius="4" Padding="8" Margin="0,0,0,8">
+                        <StackPanel>
+                            <TextBlock Text="{Binding DisciplineSummary}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                            <DataGrid ItemsSource="{Binding DisciplineRows}"
+                                      AutoGenerateColumns="False"
+                                      CanUserAddRows="False" CanUserDeleteRows="False"
+                                      IsReadOnly="True"
+                                      MaxHeight="130"
+                                      Margin="0,8,0,0">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Исполнитель" Binding="{Binding ExecutorName}" Width="*" />
+                                    <DataGridTextColumn Header="Всего" Binding="{Binding Total}" Width="70" />
+                                    <DataGridTextColumn Header="В срок" Binding="{Binding CompletedOnTime}" Width="70" />
+                                    <DataGridTextColumn Header="После срока" Binding="{Binding CompletedLate}" Width="90" />
+                                    <DataGridTextColumn Header="Просрочка" Binding="{Binding Overdue}" Width="90" />
+                                    <DataGridTextColumn Header="% исполнения" Binding="{Binding TimelyExecutionRate, StringFormat=P0}" Width="100" />
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </StackPanel>
+                    </Border>
+                    <DataGrid ItemsSource="{Binding Resolutions}"
+                              AutoGenerateColumns="False"
+                              CanUserAddRows="False" CanUserDeleteRows="False"
+                              IsReadOnly="True">
+                        <DataGrid.InputBindings>
+                            <MouseBinding MouseAction="LeftDoubleClick"
+                                          Command="{Binding DataContext.OpenDocumentCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                          CommandParameter="{Binding SelectedItem, RelativeSource={RelativeSource AncestorType=DataGrid}}" />
+                        </DataGrid.InputBindings>
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Дата" Binding="{Binding IssuedAt, StringFormat=dd.MM.yyyy HH:mm}" Width="140" />
+                            <DataGridTextColumn Header="Документ" Binding="{Binding Document.Title}" Width="*" />
+                            <DataGridTextColumn Header="Резолюция" Binding="{Binding Text}" Width="2*" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
             </TabItem>
         </TabControl>
 

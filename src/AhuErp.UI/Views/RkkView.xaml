@@ -78,7 +78,7 @@
 
                                 <TextBlock Text="Регистрационный номер" Margin="0,4" />
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="6,4">
-                                    <TextBlock Text="{Binding SelectedDocument.RegistrationNumber, FallbackValue='— ещё не зарегистрирован —'}"
+                                    <TextBlock Text="{Binding RegistrationNumberDisplay}"
                                                FontWeight="SemiBold" VerticalAlignment="Center" />
                                     <Border Background="#FCD34D" Padding="6,1" CornerRadius="3" Margin="12,0,0,0"
                                             Visibility="{Binding SelectedDocument.IsLocked, Converter={StaticResource BooleanToVisibilityConverter}}"
@@ -303,7 +303,7 @@
                                 <DataGrid.Columns>
                                     <DataGridTextColumn Header="Этап" Binding="{Binding Order}" Width="60" />
                                     <DataGridTextColumn Header="Согласующий" Binding="{Binding Approver.FullName, FallbackValue=''}" Width="180" />
-                                    <DataGridTextColumn Header="Параллельно" Binding="{Binding IsParallel}" Width="100" />
+                                    <DataGridTextColumn Header="Параллельно" Binding="{Binding IsParallel, Converter={StaticResource BooleanDisplayConverter}}" Width="100" />
                                     <DataGridTextColumn Header="Решение" Binding="{Binding Decision, Converter={StaticResource EnumDisplayConverter}}" Width="120" />
                                     <DataGridTextColumn Header="Дата" Binding="{Binding DecisionDate, StringFormat=dd.MM.yyyy HH:mm}" Width="140" />
                                     <DataGridTextColumn Header="Комментарий" Binding="{Binding Comment}" Width="*" />

@@ -24,6 +24,9 @@ namespace AhuErp.UI.ViewModels
         public ObservableCollection<VehicleTrip> SelectedVehicleTrips { get; }
         public ObservableCollection<Document> TransportRequests { get; }
 
+        public VehicleStatus[] VehicleStatuses { get; } =
+            (VehicleStatus[])Enum.GetValues(typeof(VehicleStatus));
+
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(BookCommand))]
         private Vehicle selectedVehicle;
@@ -49,6 +52,20 @@ namespace AhuErp.UI.ViewModels
 
         [ObservableProperty]
         private string statusMessage;
+
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(AddVehicleCommand))]
+        private string newVehicleLicensePlate;
+
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(AddVehicleCommand))]
+        private string newVehicleModel;
+
+        [ObservableProperty]
+        private VehicleStatus newVehicleStatus = VehicleStatus.Available;
+
+        [ObservableProperty]
+        private string newVehicleDriverName;
 
         public FleetViewModel(IVehicleRepository vehicles,
                               IFleetService fleet,
@@ -96,11 +113,41 @@ namespace AhuErp.UI.ViewModels
         [RelayCommand]
         private void Refresh() => Reload();
 
+        [RelayCommand(CanExecute = nameof(CanAddVehicle))]
+        private void AddVehicle()
+        {
+            ErrorMessage = null;
+            StatusMessage = null;
+            try
+            {
+                _vehicles.AddVehicle(new Vehicle
+                {
+                    LicensePlate = NewVehicleLicensePlate?.Trim(),
+                    Model = NewVehicleModel?.Trim(),
+                    CurrentStatus = NewVehicleStatus
+                });
+                StatusMessage = $"Добавлено ТС {NewVehicleLicensePlate}.";
+                NewVehicleLicensePlate = null;
+                NewVehicleModel = null;
+                NewVehicleStatus = VehicleStatus.Available;
+                NewVehicleDriverName = null;
+                Reload();
+            }
+            catch (Exception ex)
+            {
+                ErrorMessage = ex.Message;
+            }
+        }
+
         private bool CanBook() =>
             SelectedVehicle != null
             && SelectedDocument != null
             && !string.IsNullOrWhiteSpace(DriverName)
             && EndDate > StartDate;
+
+        private bool CanAddVehicle() =>
+            !string.IsNullOrWhiteSpace(NewVehicleLicensePlate)
+            && !string.IsNullOrWhiteSpace(NewVehicleModel);
 
         private void Reload()
         {

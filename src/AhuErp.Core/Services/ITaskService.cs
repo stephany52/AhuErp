@@ -31,6 +31,8 @@ namespace AhuErp.Core.Services
 
         IReadOnlyList<DocumentTask> ListByDocument(int documentId);
 
+        IReadOnlyList<DocumentResolution> ListResolutionsByAuthor(int authorId);
+
         /// <summary>Поручения, по которым сотрудник является исполнителем или контролёром.</summary>
         IReadOnlyList<DocumentTask> ListMyTasks(int employeeId, MyTasksScope scope = MyTasksScope.AsExecutor);
 

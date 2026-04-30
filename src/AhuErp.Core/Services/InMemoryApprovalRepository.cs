@@ -61,5 +61,15 @@ namespace AhuErp.Core.Services
                          .OrderBy(a => a.Order)
                          .ToList()
                          .AsReadOnly();
+
+        public IReadOnlyList<DocumentApproval> ListApprovalsByApprover(int approverId, ApprovalDecision? decision = null)
+        {
+            IEnumerable<DocumentApproval> q = _approvals.Where(a => a.ApproverId == approverId);
+            if (decision.HasValue) q = q.Where(a => a.Decision == decision.Value);
+            return q.OrderByDescending(a => a.DecisionDate ?? System.DateTime.MinValue)
+                    .ThenBy(a => a.Order)
+                    .ToList()
+                    .AsReadOnly();
+        }
     }
 }

@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Windows.Data;
 using AhuErp.Core.Models;
+using AhuErp.Core.Services;
+using AhuErp.UI.ViewModels;
 
 namespace AhuErp.UI.Converters
 {
@@ -55,6 +57,17 @@ namespace AhuErp.UI.Converters
             [ApprovalDecision.Approved] = "Согласовано",
             [ApprovalDecision.Rejected] = "Отклонено",
             [ApprovalDecision.Comments] = "С замечаниями",
+
+            [MyTasksScope.AsExecutor] = "Как исполнитель",
+            [MyTasksScope.AsController] = "Как контролёр",
+            [MyTasksScope.AsAuthor] = "Как автор",
+            [MyTasksScope.Any] = "Любая",
+
+            [JournalKind.Incoming] = "Входящие",
+            [JournalKind.Outgoing] = "Исходящие",
+            [JournalKind.Internal] = "Внутренние",
+            [JournalKind.ByCase] = "По делу",
+            [JournalKind.All] = "Все",
 
             [ApprovalRouteStatus.Draft] = "Черновик",
             [ApprovalRouteStatus.InProgress] = "В работе",
