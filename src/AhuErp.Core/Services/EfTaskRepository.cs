@@ -26,6 +26,13 @@ namespace AhuErp.Core.Services
 
         public DocumentResolution GetResolution(int id) => _ctx.DocumentResolutions.Find(id);
 
+        public IReadOnlyList<DocumentResolution> ListResolutionsByAuthor(int authorId)
+            => _ctx.DocumentResolutions.Include(r => r.Document)
+                .Where(r => r.AuthorId == authorId)
+                .OrderByDescending(r => r.IssuedAt)
+                .ToList()
+                .AsReadOnly();
+
         public DocumentTask AddTask(DocumentTask task)
         {
             _ctx.DocumentTasks.Add(task);

@@ -21,6 +21,9 @@ namespace AhuErp.UI.ViewModels
         public ObservableCollection<DocumentTypeRef> Types { get; }
             = new ObservableCollection<DocumentTypeRef>();
 
+        public DocumentDirection[] Directions { get; } =
+            (DocumentDirection[])Enum.GetValues(typeof(DocumentDirection));
+
         [ObservableProperty]
         private NomenclatureCase selectedCase;
 
@@ -37,13 +40,31 @@ namespace AhuErp.UI.ViewModels
         private int newCaseRetention = 5;
 
         [ObservableProperty]
+        private string newCaseArticle;
+
+        [ObservableProperty]
+        private int newCaseYear = DateTime.Now.Year;
+
+        [ObservableProperty]
+        private bool newCaseIsActive = true;
+
+        [ObservableProperty]
         private string newTypeName;
 
         [ObservableProperty]
         private string newTypeShortCode;
 
         [ObservableProperty]
-        private string newTypeTemplate = "{Code}-{CaseIndex}/{Year}-{Sequence:00000}";
+        private int newTypeRetention = 5;
+
+        [ObservableProperty]
+        private DocumentDirection newTypeDirection = DocumentDirection.Internal;
+
+        [ObservableProperty]
+        private bool newTypeIsActive = true;
+
+        [ObservableProperty]
+        private string newTypeTemplate = "{Код}-{ИндексДела}-{Год}-{Номер0000}";
 
         [ObservableProperty]
         private string errorMessage;
@@ -75,10 +96,16 @@ namespace AhuErp.UI.ViewModels
                     Index = NewCaseIndex,
                     Title = NewCaseTitle,
                     RetentionPeriodYears = NewCaseRetention,
-                    Year = DateTime.Now.Year,
-                    IsActive = true
+                    Article = NewCaseArticle,
+                    Year = NewCaseYear,
+                    IsActive = NewCaseIsActive
                 });
-                NewCaseIndex = null; NewCaseTitle = null; NewCaseRetention = 5;
+                NewCaseIndex = null;
+                NewCaseTitle = null;
+                NewCaseRetention = 5;
+                NewCaseArticle = null;
+                NewCaseYear = DateTime.Now.Year;
+                NewCaseIsActive = true;
                 Reload();
             }
             catch (Exception ex) { ErrorMessage = ex.Message; }
@@ -94,15 +121,31 @@ namespace AhuErp.UI.ViewModels
                 {
                     Name = NewTypeName,
                     ShortCode = NewTypeShortCode,
-                    DefaultDirection = DocumentDirection.Internal,
-                    DefaultRetentionYears = 5,
-                    RegistrationNumberTemplate = NewTypeTemplate,
-                    IsActive = true
+                    DefaultDirection = NewTypeDirection,
+                    DefaultRetentionYears = NewTypeRetention,
+                    RegistrationNumberTemplate = NormalizeTemplate(NewTypeTemplate),
+                    IsActive = NewTypeIsActive
                 });
-                NewTypeName = null; NewTypeShortCode = null;
+                NewTypeName = null;
+                NewTypeShortCode = null;
+                NewTypeRetention = 5;
+                NewTypeDirection = DocumentDirection.Internal;
+                NewTypeIsActive = true;
+                NewTypeTemplate = "{Код}-{ИндексДела}-{Год}-{Номер0000}";
                 Reload();
             }
             catch (Exception ex) { ErrorMessage = ex.Message; }
+        }
+
+        private static string NormalizeTemplate(string template)
+        {
+            if (string.IsNullOrWhiteSpace(template)) return template;
+            return template
+                .Replace("{Код}", "{Code}")
+                .Replace("{ИндексДела}", "{CaseIndex}")
+                .Replace("{Год}", "{Year}")
+                .Replace("{Номер0000}", "{Sequence:0000}")
+                .Replace("{Номер00000}", "{Sequence:00000}");
         }
     }
 }

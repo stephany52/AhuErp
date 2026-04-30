@@ -23,5 +23,6 @@ namespace AhuErp.Core.Services
         DocumentApproval ApplyDecision(int approvalId, ApprovalDecision decision, int actorId, string comment = null);
 
         IReadOnlyList<DocumentApproval> ListByDocument(int documentId);
+        IReadOnlyList<DocumentApproval> ListForApprover(int approverId, ApprovalDecision? decision = null);
     }
 }

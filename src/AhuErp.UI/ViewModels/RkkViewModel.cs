@@ -165,7 +165,19 @@ namespace AhuErp.UI.ViewModels
         [NotifyCanExecuteChangedFor(nameof(CreateItTicketCommand))]
         [NotifyCanExecuteChangedFor(nameof(SignSimpleCommand))]
         [NotifyCanExecuteChangedFor(nameof(SignQualifiedCommand))]
+        [NotifyPropertyChangedFor(nameof(RegistrationNumberDisplay))]
         private Document selectedDocument;
+
+        public string RegistrationNumberDisplay
+        {
+            get
+            {
+                var value = SelectedDocument?.RegistrationNumber;
+                return string.IsNullOrWhiteSpace(value) || value.IndexOf('{') >= 0 || value.IndexOf('}') >= 0
+                    ? "будет присвоен при сохранении"
+                    : value;
+            }
+        }
 
         [ObservableProperty]
         private DocumentTypeRef selectedType;

@@ -25,7 +25,16 @@ namespace AhuErp.UI.ViewModels
 
         public ObservableCollection<DocumentTask> Tasks { get; } = new ObservableCollection<DocumentTask>();
         public ObservableCollection<DocumentApproval> Approvals { get; } = new ObservableCollection<DocumentApproval>();
+        public ObservableCollection<DocumentResolution> Resolutions { get; } = new ObservableCollection<DocumentResolution>();
+        public ObservableCollection<EmployeeDisciplineRow> DisciplineRows { get; } = new ObservableCollection<EmployeeDisciplineRow>();
         public ObservableCollection<Notification> Notifications { get; } = new ObservableCollection<Notification>();
+
+        public ApprovalDecision[] ApprovalStatuses { get; } =
+        {
+            ApprovalDecision.Pending,
+            ApprovalDecision.Approved,
+            ApprovalDecision.Rejected
+        };
 
         [ObservableProperty]
         private string greeting;
@@ -35,6 +44,12 @@ namespace AhuErp.UI.ViewModels
 
         [ObservableProperty]
         private string substitutionBanner;
+
+        [ObservableProperty]
+        private ApprovalDecision selectedApprovalStatus = ApprovalDecision.Pending;
+
+        [ObservableProperty]
+        private string disciplineSummary;
 
         public MyDesktopViewModel(
             IAuthService auth,
@@ -67,9 +82,12 @@ namespace AhuErp.UI.ViewModels
             if (payload is DocumentTask task) docId = task.DocumentId;
             else if (payload is Notification n) docId = n.RelatedDocumentId;
             else if (payload is DocumentApproval a) docId = a.DocumentId;
+            else if (payload is DocumentResolution r) docId = r.DocumentId;
             if (docId.HasValue && docId.Value > 0)
                 _navigator.OpenDocument(docId.Value);
         }
+
+        partial void OnSelectedApprovalStatusChanged(ApprovalDecision value) => ReloadApprovals();
 
         [RelayCommand]
         public void Reload()
@@ -90,23 +108,25 @@ namespace AhuErp.UI.ViewModels
                 Tasks.Add(t);
             }
 
-            Approvals.Clear();
-            // Запрос согласований по этапам, ожидающим текущего пользователя:
-            // упрощённо — сканируем последние 100 уведомлений ApprovalRequired
-            // и подбираем уникальные approvalId.
-            var pendingNotifs = _notifications.ListForUser(me.Id, unreadOnly: false)
-                .Where(n => n.Kind == NotificationKind.ApprovalRequired && n.RelatedApprovalId.HasValue)
-                .ToList();
-            // Реальный сценарий — IApprovalService.ListPendingForApprover, но
-            // он не входит в текущий API; используем уведомления как индекс.
-            // Для UI этого достаточно; точная фильтрация попадёт в Phase 12.
-            foreach (var notif in pendingNotifs)
+            ReloadApprovals();
+
+            Resolutions.Clear();
+            foreach (var r in _taskService.ListResolutionsByAuthor(me.Id)
+                                          .OrderByDescending(x => x.IssuedAt))
             {
-                // Заглушка — в текущей версии Approvals остаётся пустым,
-                // т.к. без расширения IApprovalService получить полный объект
-                // согласования по Id нельзя. Список уведомлений в правой
-                // колонке покрывает функционал.
+                Resolutions.Add(r);
             }
+
+            var report = _taskService.BuildDisciplineReport(
+                DateTime.Today.AddDays(-30),
+                DateTime.Today.AddDays(1).AddSeconds(-1));
+            DisciplineSummary =
+                $"За 30 дней: всего {report.TotalTasks}, в срок {report.CompletedOnTime}, " +
+                $"после срока {report.CompletedLate}, просрочено {report.Overdue}, " +
+                $"исполнение {report.TimelyExecutionRate:P0}.";
+            DisciplineRows.Clear();
+            foreach (var row in report.ByExecutor ?? Array.Empty<EmployeeDisciplineRow>())
+                DisciplineRows.Add(row);
 
             Notifications.Clear();
             foreach (var n in _notifications.ListForUser(me.Id, unreadOnly: false).Take(50))
@@ -119,6 +139,20 @@ namespace AhuErp.UI.ViewModels
             SubstitutionBanner = sub != null
                 ? $"Активно замещение до {sub.To:dd.MM.yyyy}: исполняет {sub.SubstituteEmployee?.FullName ?? "(заместитель)"}."
                 : null;
+        }
+
+        private void ReloadApprovals()
+        {
+            Approvals.Clear();
+            var me = _auth.CurrentEmployee;
+            if (me == null) return;
+            foreach (var approval in _approvalService.ListForApprover(me.Id, SelectedApprovalStatus)
+                                                     .OrderBy(a => a.Decision == ApprovalDecision.Pending ? 0 : 1)
+                                                     .ThenBy(a => a.Document?.Deadline ?? DateTime.MaxValue)
+                                                     .ThenByDescending(a => a.DecisionDate ?? DateTime.MinValue))
+            {
+                Approvals.Add(approval);
+            }
         }
 
         [RelayCommand]

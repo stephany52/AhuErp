@@ -198,5 +198,8 @@ namespace AhuErp.Core.Services
 
         public IReadOnlyList<DocumentApproval> ListByDocument(int documentId)
             => _repository.ListApprovalsByDocument(documentId);
+
+        public IReadOnlyList<DocumentApproval> ListForApprover(int approverId, ApprovalDecision? decision = null)
+            => _repository.ListApprovalsByApprover(approverId, decision);
     }
 }

@@ -16,5 +16,6 @@ namespace AhuErp.Core.Services
         DocumentApproval GetApproval(int id);
         void UpdateApproval(DocumentApproval approval);
         IReadOnlyList<DocumentApproval> ListApprovalsByDocument(int documentId);
+        IReadOnlyList<DocumentApproval> ListApprovalsByApprover(int approverId, ApprovalDecision? decision = null);
     }
 }

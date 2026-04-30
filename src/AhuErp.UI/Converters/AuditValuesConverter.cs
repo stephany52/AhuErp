@@ -47,6 +47,24 @@ namespace AhuErp.UI.Converters
                 ["DelegationId"] = "Делегирование",
                 ["HeadEmployeeId"] = "Руководитель",
                 ["TaskId"] = "Поручение",
+                ["BasisDocumentId"] = "Документ-основание",
+                ["Item"] = "Позиция",
+                ["Qty"] = "Количество",
+                ["Vehicle"] = "Транспорт",
+                ["Driver"] = "Водитель",
+                ["TemplateId"] = "Маршрут",
+                ["Decision"] = "Решение",
+                ["ApprovalId"] = "Согласование",
+                ["DocumentTypeRefId"] = "Вид документа",
+                ["NomenclatureCaseId"] = "Дело",
+                ["DefaultDirection"] = "Направление",
+                ["DefaultRetentionYears"] = "Срок хранения",
+                ["RegistrationNumberTemplate"] = "Шаблон номера",
+                ["ShortCode"] = "Код",
+                ["Direction"] = "Направление",
+                ["AccessLevel"] = "Гриф доступа",
+                ["AssignedEmployeeId"] = "Исполнитель",
+                ["Comment"] = "Комментарий",
             };
 
         private static readonly IReadOnlyDictionary<string, string> ValueMap =
@@ -56,6 +74,19 @@ namespace AhuErp.UI.Converters
                 ["false"] = "нет",
                 ["null"] = "—",
                 ["Substitution"] = "По замещению",
+                ["Deactivated"] = "Деактивировано",
+                ["Pending"] = "Ожидает",
+                ["Approved"] = "Согласовано",
+                ["Rejected"] = "Отклонено",
+                ["Comments"] = "С замечаниями",
+                ["New"] = "Новый",
+                ["InProgress"] = "В работе",
+                ["Completed"] = "Завершён",
+                ["Cancelled"] = "Отменён",
+                ["Internal"] = "Внутренний",
+                ["Incoming"] = "Входящий",
+                ["Outgoing"] = "Исходящий",
+                ["Directive"] = "Распорядительный",
             };
 
         private static readonly Regex Splitter = new Regex(@"\s*;\s*", RegexOptions.Compiled);
@@ -80,13 +111,32 @@ namespace AhuErp.UI.Converters
         {
             if (string.IsNullOrEmpty(part)) return part;
             var idx = part.IndexOf('=');
-            if (idx <= 0) return part;
+            if (idx <= 0) return TranslateFreeText(part);
 
             var rawKey = part.Substring(0, idx).Trim();
             var rawVal = part.Substring(idx + 1).Trim();
             var key = KeyMap.TryGetValue(rawKey, out var k) ? k : rawKey;
             var val = ValueMap.TryGetValue(rawVal, out var v) ? v : rawVal;
             return key + " = " + val;
+        }
+
+        private static string TranslateFreeText(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return text;
+            var translated = text
+                .Replace("AttachmentTextIndices", "индекса вложений")
+                .Replace("DocumentApproval", "согласование")
+                .Replace("DocumentResolution", "резолюция")
+                .Replace("DocumentTask", "поручение")
+                .Replace("Document", "документ")
+                .Replace("NomenclatureCase", "дело номенклатуры")
+                .Replace("DocumentTypeRef", "вид документа")
+                .Replace("InventoryTransaction", "движение ТМЦ")
+                .Replace("VehicleTrip", "путевой лист")
+                .Replace("Created", "создано")
+                .Replace("Updated", "изменено")
+                .Replace("Deleted", "удалено");
+            return ValueMap.TryGetValue(translated, out var v) ? v : translated;
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)

@@ -141,7 +141,7 @@ namespace AhuErp.UI.ViewModels
             try
             {
                 var count = _searchIndex.ReindexAll();
-                StatusMessage = $"Поисковый индекс перестроен: обработано {count} записей.";
+                StatusMessage = $"Перестроено {count} записей индекса вложений.";
             }
             catch (Exception ex)
             {

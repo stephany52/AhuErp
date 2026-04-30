@@ -8,6 +8,7 @@ namespace AhuErp.Core.Services
     {
         DocumentResolution AddResolution(DocumentResolution resolution);
         DocumentResolution GetResolution(int id);
+        IReadOnlyList<DocumentResolution> ListResolutionsByAuthor(int authorId);
 
         DocumentTask AddTask(DocumentTask task);
         DocumentTask GetTask(int id);

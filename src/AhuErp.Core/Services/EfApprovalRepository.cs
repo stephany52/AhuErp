@@ -67,5 +67,22 @@ namespace AhuErp.Core.Services
             => _ctx.DocumentApprovals.Include(a => a.Approver)
                 .Where(a => a.DocumentId == documentId)
                 .OrderBy(a => a.Order).ToList().AsReadOnly();
+
+        public IReadOnlyList<DocumentApproval> ListApprovalsByApprover(int approverId, ApprovalDecision? decision = null)
+        {
+            IQueryable<DocumentApproval> q = _ctx.DocumentApprovals
+                .Include(a => a.Document)
+                .Include(a => a.Approver)
+                .Where(a => a.ApproverId == approverId);
+            if (decision.HasValue)
+            {
+                var d = decision.Value;
+                q = q.Where(a => a.Decision == d);
+            }
+            return q.OrderByDescending(a => a.DecisionDate)
+                    .ThenBy(a => a.Order)
+                    .ToList()
+                    .AsReadOnly();
+        }
     }
 }

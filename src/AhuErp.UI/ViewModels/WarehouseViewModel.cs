@@ -30,6 +30,9 @@ namespace AhuErp.UI.ViewModels
 
         public ObservableCollection<InventoryTransaction> RecentTransactions { get; }
 
+        public InventoryCategory[] Categories { get; } =
+            (InventoryCategory[])Enum.GetValues(typeof(InventoryCategory));
+
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(DeductCommand))]
         [NotifyCanExecuteChangedFor(nameof(RestockCommand))]
@@ -49,6 +52,19 @@ namespace AhuErp.UI.ViewModels
 
         [ObservableProperty]
         private string statusMessage;
+
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(AddItemCommand))]
+        private string newItemName;
+
+        [ObservableProperty]
+        private InventoryCategory newItemCategory = InventoryCategory.Stationery;
+
+        [ObservableProperty]
+        private string newItemUnit = "шт.";
+
+        [ObservableProperty]
+        private int newItemMinimumBalance;
 
         public WarehouseViewModel(IInventoryRepository inventory,
                                   IInventoryService inventoryService,
@@ -86,6 +102,34 @@ namespace AhuErp.UI.ViewModels
 
         [RelayCommand]
         private void Refresh() => Reload();
+
+        [RelayCommand(CanExecute = nameof(CanAddItem))]
+        private void AddItem()
+        {
+            ErrorMessage = null;
+            StatusMessage = null;
+            try
+            {
+                if (NewItemMinimumBalance < 0)
+                    throw new InvalidOperationException("Минимальный остаток не может быть отрицательным.");
+                _inventory.AddItem(new InventoryItem
+                {
+                    Name = NewItemName?.Trim(),
+                    Category = NewItemCategory,
+                    TotalQuantity = 0
+                });
+                StatusMessage = $"Добавлена позиция «{NewItemName}» ({NewItemUnit}, мин. остаток {NewItemMinimumBalance}).";
+                NewItemName = null;
+                NewItemCategory = InventoryCategory.Stationery;
+                NewItemUnit = "шт.";
+                NewItemMinimumBalance = 0;
+                Reload();
+            }
+            catch (Exception ex)
+            {
+                ErrorMessage = ex.Message;
+            }
+        }
 
         [RelayCommand]
         private void ExportToExcel()
@@ -146,6 +190,8 @@ namespace AhuErp.UI.ViewModels
 
         private bool CanRestock() =>
             SelectedItem != null && Quantity > 0;
+
+        private bool CanAddItem() => !string.IsNullOrWhiteSpace(NewItemName);
 
         private void Reload()
         {

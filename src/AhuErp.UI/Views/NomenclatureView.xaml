@@ -32,21 +32,36 @@
                                 <ColumnDefinition Width="120" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="80" />
+                                <ColumnDefinition Width="100" />
+                                <ColumnDefinition Width="80" />
+                                <ColumnDefinition Width="80" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBox Text="{Binding NewCaseIndex, UpdateSourceTrigger=PropertyChanged}"
-                                     ToolTip="Индекс (например, 01-02)"
-                                     Margin="0,0,6,0" Padding="6" VerticalAlignment="Center" />
-                            <TextBox Grid.Column="1"
-                                     Text="{Binding NewCaseTitle, UpdateSourceTrigger=PropertyChanged}"
-                                     ToolTip="Заголовок дела"
-                                     Margin="0,0,6,0" Padding="6" VerticalAlignment="Center" />
-                            <TextBox Grid.Column="2"
-                                     Text="{Binding NewCaseRetention, UpdateSourceTrigger=PropertyChanged}"
-                                     ToolTip="Срок хранения, лет"
-                                     Margin="0,0,6,0" Padding="6" VerticalAlignment="Center" />
-                            <Button Grid.Column="3" Content="Добавить" Command="{Binding AddCaseCommand}"
-                                    Padding="10,4" />
+                            <StackPanel Margin="0,0,6,0">
+                                <TextBlock Text="Индекс" />
+                                <TextBox Text="{Binding NewCaseIndex, UpdateSourceTrigger=PropertyChanged}" Padding="6" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Margin="0,0,6,0">
+                                <TextBlock Text="Заголовок" />
+                                <TextBox Text="{Binding NewCaseTitle, UpdateSourceTrigger=PropertyChanged}" Padding="6" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Margin="0,0,6,0">
+                                <TextBlock Text="Срок хранения" />
+                                <TextBox Text="{Binding NewCaseRetention, UpdateSourceTrigger=PropertyChanged}" Padding="6" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="3" Margin="0,0,6,0">
+                                <TextBlock Text="Статья" />
+                                <TextBox Text="{Binding NewCaseArticle, UpdateSourceTrigger=PropertyChanged}" Padding="6" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="4" Margin="0,0,6,0">
+                                <TextBlock Text="Год" />
+                                <TextBox Text="{Binding NewCaseYear, UpdateSourceTrigger=PropertyChanged}" Padding="6" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="5" Margin="0,0,6,0" VerticalAlignment="Bottom">
+                                <CheckBox Content="Активно" IsChecked="{Binding NewCaseIsActive}" />
+                            </StackPanel>
+                            <Button Grid.Column="6" Content="Добавить" Command="{Binding AddCaseCommand}"
+                                    Padding="10,4" VerticalAlignment="Bottom" />
                         </Grid>
                     </Border>
                     <DataGrid ItemsSource="{Binding Cases}"
@@ -73,22 +88,42 @@
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="80" />
+                                <ColumnDefinition Width="130" />
+                                <ColumnDefinition Width="90" />
+                                <ColumnDefinition Width="80" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBox Text="{Binding NewTypeName, UpdateSourceTrigger=PropertyChanged}"
-                                     ToolTip="Название вида"
-                                     Margin="0,0,6,0" Padding="6" VerticalAlignment="Center" />
-                            <TextBox Grid.Column="1"
-                                     Text="{Binding NewTypeShortCode, UpdateSourceTrigger=PropertyChanged}"
-                                     ToolTip="Код"
-                                     Margin="0,0,6,0" Padding="6" VerticalAlignment="Center" />
-                            <TextBox Grid.Column="2"
-                                     Text="{Binding NewTypeTemplate, UpdateSourceTrigger=PropertyChanged}"
-                                     ToolTip="Шаблон номера"
-                                     Margin="0,0,6,0" Padding="6" VerticalAlignment="Center" />
-                            <Button Grid.Column="3" Content="Добавить" Command="{Binding AddTypeCommand}"
-                                    Padding="10,4" />
+                            <StackPanel Margin="0,0,6,0">
+                                <TextBlock Text="Название" />
+                                <TextBox Text="{Binding NewTypeName, UpdateSourceTrigger=PropertyChanged}" Padding="6" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Margin="0,0,6,0">
+                                <TextBlock Text="Код вида" />
+                                <TextBox Text="{Binding NewTypeShortCode, UpdateSourceTrigger=PropertyChanged}" Padding="6" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Margin="0,0,6,0">
+                                <TextBlock Text="Направление" />
+                                <ComboBox ItemsSource="{Binding Directions}"
+                                          SelectedItem="{Binding NewTypeDirection}"
+                                          ItemTemplate="{StaticResource EnumComboBoxItemTemplate}"
+                                          Padding="6" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="3" Margin="0,0,6,0">
+                                <TextBlock Text="Срок хранения" />
+                                <TextBox Text="{Binding NewTypeRetention, UpdateSourceTrigger=PropertyChanged}" Padding="6" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="4" Margin="0,0,6,0" VerticalAlignment="Bottom">
+                                <CheckBox Content="Активно" IsChecked="{Binding NewTypeIsActive}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="5" Margin="0,0,6,0">
+                                <TextBlock Text="Шаблон номера" />
+                                <TextBox Text="{Binding NewTypeTemplate, UpdateSourceTrigger=PropertyChanged}"
+                                         ToolTip="{Код}-{ИндексДела}-{Год}-{Номер0000}"
+                                         Padding="6" />
+                            </StackPanel>
+                            <Button Grid.Column="6" Content="Добавить" Command="{Binding AddTypeCommand}"
+                                    Padding="10,4" VerticalAlignment="Bottom" />
                         </Grid>
                     </Border>
                     <DataGrid ItemsSource="{Binding Types}"
