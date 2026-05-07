@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Data.Entity;
 using System.Linq;
 using AhuErp.Core.Data;
@@ -72,12 +73,38 @@ namespace AhuErp.Core.Services
             return typeRef;
         }
 
-        public int GetMaxSequence(int documentTypeRefId, int year)
+        public int GetNextSequence(string typeCode, int documentTypeRefId, int year)
         {
-            // Считаем не количество, а реальный максимум числовой последовательности
-            // в уже выданных регистрационных номерах данного вида за указанный год.
-            // Использование Count() было бы небезопасно: после удаления документа
-            // следующий номер мог бы повторить уже выпущенный.
+            if (string.IsNullOrWhiteSpace(typeCode))
+                throw new ArgumentException("Код вида документа обязателен.", nameof(typeCode));
+
+            var normalizedCode = typeCode.Trim();
+            using (var tx = _ctx.Database.BeginTransaction(IsolationLevel.Serializable))
+            {
+                var counter = _ctx.NomenclatureCounters.SingleOrDefault(c => c.TypeCode == normalizedCode && c.Year == year);
+                if (counter == null)
+                {
+                    counter = new NomenclatureCounter
+                    {
+                        TypeCode = normalizedCode,
+                        Year = year,
+                        LastNumber = GetMaxSequenceFromDocuments(documentTypeRefId, year) + 1
+                    };
+                    _ctx.NomenclatureCounters.Add(counter);
+                }
+                else
+                {
+                    counter.LastNumber++;
+                }
+
+                _ctx.SaveChanges();
+                tx.Commit();
+                return counter.LastNumber;
+            }
+        }
+
+        private int GetMaxSequenceFromDocuments(int documentTypeRefId, int year)
+        {
             var numbers = _ctx.Documents
                 .Where(d => d.DocumentTypeRefId == documentTypeRefId
                             && d.RegistrationDate.HasValue
@@ -95,11 +122,6 @@ namespace AhuErp.Core.Services
             return max;
         }
 
-        /// <summary>
-        /// Извлекает числовую последовательность из хвоста регистрационного номера
-        /// (поддерживаем шаблоны вида «АХУ-01-02/2026-00037» — берём последний
-        /// «числовой блок»). Возвращает 0, если распарсить не удалось.
-        /// </summary>
         private static int ParseTrailingSequence(string registrationNumber)
         {
             if (string.IsNullOrEmpty(registrationNumber)) return 0;
@@ -110,14 +132,6 @@ namespace AhuErp.Core.Services
             while (start - 1 >= 0 && char.IsDigit(registrationNumber[start - 1])) start--;
             var slice = registrationNumber.Substring(start, end - start + 1);
             return int.TryParse(slice, out var value) ? value : 0;
-        }
-
-        /// <summary>
-        /// В EF-реализации <see cref="GetMaxSequence"/> вычисляется по реальным
-        /// документам, поэтому отдельный счётчик не нужен — метод пустой.
-        /// </summary>
-        public void BumpSequence(int documentTypeRefId, int year, int sequence)
-        {
         }
 
         public IReadOnlyList<Department> ListDepartments()

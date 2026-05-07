@@ -9,6 +9,7 @@ namespace AhuErp.Core.Models
         InProgress = 1,
         OnHold = 2,
         Completed = 3,
-        Cancelled = 4
+        Cancelled = 4,
+        Registered = 5
     }
 }

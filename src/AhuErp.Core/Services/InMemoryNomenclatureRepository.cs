@@ -14,7 +14,8 @@ namespace AhuErp.Core.Services
         private readonly List<NomenclatureCase> _cases = new List<NomenclatureCase>();
         private readonly List<DocumentTypeRef> _types = new List<DocumentTypeRef>();
         private readonly List<Department> _departments = new List<Department>();
-        private readonly Dictionary<(int typeId, int year), int> _sequences = new Dictionary<(int, int), int>();
+        private readonly Dictionary<(string typeCode, int year), int> _sequences = new Dictionary<(string, int), int>();
+        private readonly object _sequenceSync = new object();
         private int _nextCaseId = 1;
         private int _nextTypeId = 1;
         private int _nextDeptId = 1;
@@ -72,15 +73,19 @@ namespace AhuErp.Core.Services
             return typeRef;
         }
 
-        public int GetMaxSequence(int documentTypeRefId, int year)
+        public int GetNextSequence(string typeCode, int documentTypeRefId, int year)
         {
-            return _sequences.TryGetValue((documentTypeRefId, year), out var s) ? s : 0;
-        }
+            if (string.IsNullOrWhiteSpace(typeCode))
+                throw new ArgumentException("Код вида документа обязателен.", nameof(typeCode));
 
-        public void BumpSequence(int documentTypeRefId, int year, int sequence)
-        {
-            var current = GetMaxSequence(documentTypeRefId, year);
-            if (sequence > current) _sequences[(documentTypeRefId, year)] = sequence;
+            var key = (typeCode.Trim(), year);
+            lock (_sequenceSync)
+            {
+                var current = _sequences.TryGetValue(key, out var value) ? value : 0;
+                var next = current + 1;
+                _sequences[key] = next;
+                return next;
+            }
         }
 
         public IReadOnlyList<Department> ListDepartments() => _departments.AsReadOnly();

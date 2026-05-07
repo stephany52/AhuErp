@@ -19,7 +19,7 @@ AhuErp.sln
 │       ├── Views/       ← DashboardView, PlaceholderView
 │       └── Converters/  ← OverdueRowColorConverter
 └── tests/
-    └── AhuErp.Tests/    ← xUnit, 21 тест
+    └── AhuErp.Tests/    ← xUnit, сервисные и интеграционные тесты
 ```
 
 Все три проекта — SDK-style `.csproj`, `TargetFramework=net48`, что позволяет
@@ -61,7 +61,7 @@ dotnet test    AhuErp.sln -c Debug
 dotnet format  AhuErp.sln --verify-no-changes --exclude src/AhuErp.Core/Migrations
 ```
 
-Ожидаемый результат: **0 errors, 0 warnings, 21/21 passed**.
+Ожидаемый результат: **0 errors, 0 warnings, все xUnit-тесты passed**.
 
 ### Запуск WPF приложения
 
@@ -239,6 +239,14 @@ existingTrips.Any(t => t.VehicleId == vehicleId
 ### LiveCharts DataContext-биндинги
 
 `PieChart.Series` и `CartesianChart.Series` биндятся к `SeriesCollection`-свойствам `DocumentStatusSeries` и `InventoryByCategorySeries` в `DashboardViewModel`. `CartesianChart.AxisX.Labels` биндится к `string[] InventoryCategoryLabels`. `DashboardViewModel` наследует `ViewModelBase : ObservableObject` (CommunityToolkit.Mvvm), поэтому `[ObservableProperty]` генерирует `INotifyPropertyChanged`-уведомления, и LiveCharts перестраивает диаграммы при каждом `RefreshAsync()`. Важно: `SeriesCollection` собирается в фоновом `Task.Run`, но применяется к VM в UI-потоке через `await ... .ConfigureAwait(true)` — LiveCharts поддерживает только UI-поточное обновление.
+
+## Acceptance fixes — Bug #1: автоматическая регистрация РКК
+
+- `RkkViewModel.Save()` автоматически регистрирует сохранённую РКК через `NomenclatureService.Register(...)`, если документ ещё не зарегистрирован и `RolePolicy.AutoRegisterOnSave == true`.
+- Регистрационный номер всегда формируется как `{TypeCode}-{YYYY}-{N:D5}`; шаблонные значения с `{` или `}` запрещены на уровне `Document`/репозиториев/`AhuDbContext.SaveChanges()`.
+- Последовательность `N` хранится в `NomenclatureCounters` с уникальным ключом `(TypeCode, Year)`; EF-репозиторий выдаёт номер в транзакции `Serializable`, in-memory репозиторий защищён lock-ом.
+- При регистрации выставляются `RegistrationDate = DateTime.Now` и `Status = DocumentStatus.Registered`.
+- Покрытие: `NomenclatureServiceTests.Register_AssignsSequentialNumber`, `Register_DoesNotReuseNumberAfterDelete`, `Register_IsAtomicUnderConcurrency`, плюс проверка запрета шаблонных номеров.
 
 ## Roadmap (будущие итерации)
 

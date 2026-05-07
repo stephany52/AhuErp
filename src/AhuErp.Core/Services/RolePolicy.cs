@@ -33,6 +33,8 @@ namespace AhuErp.Core.Services
         public const string Substitutions = nameof(Substitutions);
         public const string NotificationPrefs = nameof(NotificationPrefs);
 
+        public static bool AutoRegisterOnSave { get; set; } = true;
+
         private static readonly IReadOnlyDictionary<EmployeeRole, HashSet<string>> _allowed =
             new Dictionary<EmployeeRole, HashSet<string>>
             {

@@ -27,6 +27,7 @@ namespace AhuErp.UI.Converters
             [DocumentStatus.OnHold] = "Приостановлен",
             [DocumentStatus.Completed] = "Завершён",
             [DocumentStatus.Cancelled] = "Отменён",
+            [DocumentStatus.Registered] = "Зарегистрирован",
 
             [DocumentType.General] = "Общий",
             [DocumentType.Office] = "Документационное обеспечение",
