@@ -763,8 +763,14 @@ namespace AhuErp.UI.ViewModels
                 SignReason = null;
 
                 // Обновляем выбранный документ — поднимет PropertyChanged для всех
-                // зависимых биндингов (баннер, IsReadOnly).
+                // зависимых биндингов (баннер, IsReadOnly у Title/Correspondent/Summary).
+                // InMemoryDocumentRepository.GetById() возвращает ту же ссылку, что
+                // лежит в SelectedDocument, поэтому SetProperty не зафиксирует
+                // изменения и WPF не перевычислит {Binding SelectedDocument.IsLocked}.
+                // Сначала сбрасываем в null, затем переустанавливаем — это вынудит
+                // WPF переподписаться на свойства документа и перерисовать поля.
                 var refreshed = _documents.GetById(doc.Id);
+                SelectedDocument = null;
                 if (refreshed != null) SelectedDocument = refreshed;
                 OnPropertyChanged(nameof(IsDocumentLocked));
                 ReloadHistory();
