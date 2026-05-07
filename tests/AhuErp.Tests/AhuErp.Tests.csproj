@@ -20,6 +20,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\AhuErp.Core\AhuErp.Core.csproj" />
+    <!-- Bug #2: тесты на VM-ы рабочего стола (MyDesktopViewModel) требуют
+         доступ к проекту AhuErp.UI. Сам UI — WinExe + WPF, в тестах WPF
+         не запускается, но загрузка типов нужна. -->
+    <ProjectReference Include="..\..\src\AhuErp.UI\AhuErp.UI.csproj" />
   </ItemGroup>
 
 </Project>
