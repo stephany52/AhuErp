@@ -73,8 +73,19 @@ namespace AhuErp.Core.Services
             // Уведомления упомянутым исполнителям (in-app + e-mail в зависимости
             // от индивидуальных предпочтений). Обработка best-effort: при
             // отсутствии EmployeeRepository или NotificationService резолюция
-            // всё равно создаётся.
-            NotifyMentionedExecutors(resolution, doc, authorId);
+            // всё равно создаётся. Любая ошибка инфраструктуры уведомлений
+            // (сбой БД, сети) не должна откатывать уже сохранённую и
+            // занесённую в аудит резолюцию — иначе при повторном клике
+            // создаётся дубликат.
+            try
+            {
+                NotifyMentionedExecutors(resolution, doc, authorId);
+            }
+            catch (Exception ex)
+            {
+                _audit.Record(AuditActionType.Other, nameof(DocumentResolution), resolution.Id, authorId,
+                    newValues: $"NotifyMentionedExecutors failed: {ex.GetType().Name}: {ex.Message}");
+            }
             return resolution;
         }
 
