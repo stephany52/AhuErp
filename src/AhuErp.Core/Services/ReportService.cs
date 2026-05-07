@@ -497,6 +497,7 @@ namespace AhuErp.Core.Services
                 case DocumentStatus.OnHold: return "Отложен";
                 case DocumentStatus.Completed: return "Завершён";
                 case DocumentStatus.Cancelled: return "Отменён";
+                case DocumentStatus.Registered: return "Зарегистрирован";
                 default: return s.ToString();
             }
         }

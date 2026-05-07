@@ -533,7 +533,7 @@ namespace AhuErp.UI.ViewModels
 
         private bool AutoRegisterOnSaveIfNeeded(Document doc)
         {
-            if (!RolePolicy.AutoRegisterOnSave || doc == null || doc.IsRegistered || !doc.DocumentTypeRefId.HasValue)
+            if (!RolePolicy.AutoRegisterOnSave || doc == null || doc.IsRegistered || doc.IsLocked || !doc.DocumentTypeRefId.HasValue)
                 return false;
 
             _nomenclature.Register(doc.Id, SelectedCase?.Id ?? doc.NomenclatureCaseId);
