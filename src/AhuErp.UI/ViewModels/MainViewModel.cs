@@ -72,9 +72,13 @@ namespace AhuErp.UI.ViewModels
 
             // Bug #2 — слушаем шину сообщений: MyDesktopViewModel.MarkRead
             // публикует UnreadCountChangedMessage, мы обновляем бейдж в шапке
-            // без прямой ссылки между VM-ами.
-            (messenger ?? WeakReferenceMessenger.Default).Register<UnreadCountChangedMessage>(
-                this, (recipient, msg) => UnreadNotifications = msg.Value);
+            // без прямой ссылки между VM-ами. Используем перегрузку
+            // Register&lt;TRecipient,TMessage&gt; со static-лямбдой, иначе
+            // closure захватит this, и WeakReferenceMessenger будет вечно
+            // удерживать MainViewModel со всеми его транзиентными зависимостями
+            // (Dashboard, Office, Rkk и т.д.) на каждом цикле logout/re-login.
+            (messenger ?? WeakReferenceMessenger.Default).Register<MainViewModel, UnreadCountChangedMessage>(
+                this, static (recipient, msg) => recipient.UnreadNotifications = msg.Value);
 
             NavigationItems = new ObservableCollection<NavigationItem>
             {
