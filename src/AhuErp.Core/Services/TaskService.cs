@@ -92,7 +92,7 @@ namespace AhuErp.Core.Services
 
                 _notifications.Create(
                     employee.Id,
-                    NotificationKind.TaskAssigned,
+                    NotificationKind.ResolutionAdded,
                     $"Резолюция по документу #{doc.Id}",
                     $"Документ {doc.RegistrationNumber ?? "#" + doc.Id} «{doc.Title}». {resolution.Text}",
                     docId: doc.Id);

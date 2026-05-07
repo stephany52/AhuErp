@@ -89,10 +89,13 @@ namespace AhuErp.Tests
             Assert.Single(auditLogs);
             Assert.Equal(resolution.Id, auditLogs[0].EntityId);
 
-            // Упомянутый исполнитель получил уведомление.
+            // Упомянутый исполнитель получил уведомление с правильным
+            // подтипом — иначе пользовательские предпочтения по
+            // ResolutionAdded будут игнорироваться, а TaskAssigned-канал
+            // ошибочно блокировать резолюции.
             var inbox = notifications.ListForUser(2, unreadOnly: true);
             Assert.Single(inbox);
-            Assert.Equal(NotificationKind.TaskAssigned, inbox[0].Kind);
+            Assert.Equal(NotificationKind.ResolutionAdded, inbox[0].Kind);
             Assert.Equal(doc.Id, inbox[0].RelatedDocumentId);
             Assert.Contains("Резолюция", inbox[0].Title);
         }
