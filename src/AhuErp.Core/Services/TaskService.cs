@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using AhuErp.Core.Models;
 
 namespace AhuErp.Core.Services
@@ -19,6 +20,7 @@ namespace AhuErp.Core.Services
         private readonly ISubstitutionService _substitution;
         private readonly IDelegationRepository _delegations;
         private readonly INotificationService _notifications;
+        private readonly IEmployeeRepository _employees;
 
         public TaskService(
             ITaskRepository tasks,
@@ -27,7 +29,8 @@ namespace AhuErp.Core.Services
             IWorkflowService workflow = null,
             ISubstitutionService substitution = null,
             IDelegationRepository delegations = null,
-            INotificationService notifications = null)
+            INotificationService notifications = null,
+            IEmployeeRepository employees = null)
         {
             _tasks = tasks ?? throw new ArgumentNullException(nameof(tasks));
             _documents = documents ?? throw new ArgumentNullException(nameof(documents));
@@ -36,7 +39,18 @@ namespace AhuErp.Core.Services
             _substitution = substitution;
             _delegations = delegations;
             _notifications = notifications;
+            _employees = employees;
         }
+
+        // Bug #4. Распознаём упоминания исполнителя в тексте резолюции по
+        // традиционному формату делопроизводства «@ФамилияИО» (например,
+        // «@ИвановИИ» — Иванов И.И.). Берём заглавную кириллическую/латинскую
+        // букву как начало упоминания после @ и далее буквы (без пробелов).
+        // Совпадение ищется по сжатому виду ФИО сотрудника:
+        //   "Иванов Иван Иванович" → "ИвановИИ".
+        private static readonly Regex MentionRegex = new Regex(
+            @"@([\p{L}]+)",
+            RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
         public DocumentResolution AddResolution(int documentId, int authorId, string text)
         {
@@ -55,7 +69,64 @@ namespace AhuErp.Core.Services
             resolution = _tasks.AddResolution(resolution);
             _audit.Record(AuditActionType.ResolutionIssued, nameof(DocumentResolution), resolution.Id, authorId,
                 newValues: $"DocumentId={doc.Id}; Length={text.Length}");
+
+            // Уведомления упомянутым исполнителям (in-app + e-mail в зависимости
+            // от индивидуальных предпочтений). Обработка best-effort: при
+            // отсутствии EmployeeRepository или NotificationService резолюция
+            // всё равно создаётся.
+            NotifyMentionedExecutors(resolution, doc, authorId);
             return resolution;
+        }
+
+        private void NotifyMentionedExecutors(DocumentResolution resolution, Document doc, int authorId)
+        {
+            if (_notifications == null || _employees == null) return;
+
+            var notified = new HashSet<int>();
+            foreach (Match m in MentionRegex.Matches(resolution.Text ?? string.Empty))
+            {
+                var token = m.Groups[1].Value;
+                var employee = ResolveEmployeeByMention(token);
+                if (employee == null || employee.Id == authorId) continue;
+                if (!notified.Add(employee.Id)) continue;
+
+                _notifications.Create(
+                    employee.Id,
+                    NotificationKind.TaskAssigned,
+                    $"Резолюция по документу #{doc.Id}",
+                    $"Документ {doc.RegistrationNumber ?? "#" + doc.Id} «{doc.Title}». {resolution.Text}",
+                    docId: doc.Id);
+            }
+        }
+
+        private Employee ResolveEmployeeByMention(string mention)
+        {
+            if (string.IsNullOrWhiteSpace(mention)) return null;
+            // Кандидаты: все активные сотрудники. Сжатый вид ФИО сравниваем
+            // case-insensitive: «ИвановИИ» ↔ "Иванов Иван Иванович".
+            foreach (var emp in _employees.ListAll())
+            {
+                if (emp == null || string.IsNullOrWhiteSpace(emp.FullName)) continue;
+                var compact = CompactFullName(emp.FullName);
+                if (compact.Length == 0) continue;
+                if (string.Equals(compact, mention, StringComparison.OrdinalIgnoreCase))
+                    return emp;
+            }
+            return null;
+        }
+
+        private static string CompactFullName(string fullName)
+        {
+            // "Иванов Иван Иванович" → "ИвановИИ"
+            // "Петрова Анна" → "ПетроваА"
+            var parts = fullName.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 0) return string.Empty;
+            var sb = new System.Text.StringBuilder(parts[0]);
+            for (int i = 1; i < parts.Length; i++)
+            {
+                if (parts[i].Length > 0) sb.Append(parts[i][0]);
+            }
+            return sb.ToString();
         }
 
         public DocumentTask CreateTask(
@@ -184,6 +255,9 @@ namespace AhuErp.Core.Services
 
         public IReadOnlyList<DocumentResolution> ListResolutionsByAuthor(int authorId)
             => _tasks.ListResolutionsByAuthor(authorId);
+
+        public IReadOnlyList<DocumentResolution> ListResolutionsByDocument(int documentId)
+            => _tasks.ListResolutionsByDocument(documentId);
 
         public IReadOnlyList<DocumentTask> ListMyTasks(int employeeId, MyTasksScope scope = MyTasksScope.AsExecutor)
         {

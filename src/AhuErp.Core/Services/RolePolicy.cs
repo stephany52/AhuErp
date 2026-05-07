@@ -95,6 +95,15 @@ namespace AhuErp.Core.Services
         public static bool CanCreateSubstitution(EmployeeRole r)
             => r == EmployeeRole.Admin || r == EmployeeRole.Manager;
 
+        /// <summary>
+        /// Право наложить резолюцию руководителя на документ. Резолюция —
+        /// текстовое указание автора, от неё далее порождаются конкретные
+        /// поручения. По регламенту учреждения это прерогатива руководителя
+        /// (или администратора при настройке системы).
+        /// </summary>
+        public static bool CanIssueResolution(EmployeeRole r)
+            => r == EmployeeRole.Admin || r == EmployeeRole.Manager;
+
         /// <summary>Доступ к разделу «Отчёты».</summary>
         public static bool CanViewReports(EmployeeRole r)
             => r == EmployeeRole.Admin || r == EmployeeRole.Manager || r == EmployeeRole.Archivist;
