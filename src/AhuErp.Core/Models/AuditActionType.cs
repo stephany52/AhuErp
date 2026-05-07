@@ -38,6 +38,7 @@ namespace AhuErp.Core.Models
         SignatureAdded = 60,
         SignatureRevoked = 61,
         DocumentLocked = 62,
+        DocumentUnlocked = 63,
 
         // Phase 9 — нотификации.
         NotificationSent = 70,
