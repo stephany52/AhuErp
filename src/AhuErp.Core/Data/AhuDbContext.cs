@@ -73,6 +73,18 @@ namespace AhuErp.Core.Data
             return base.SaveChanges();
         }
 
+        public override System.Threading.Tasks.Task<int> SaveChangesAsync()
+        {
+            ValidateDocumentRegistrationNumbers();
+            return base.SaveChangesAsync();
+        }
+
+        public override System.Threading.Tasks.Task<int> SaveChangesAsync(System.Threading.CancellationToken cancellationToken)
+        {
+            ValidateDocumentRegistrationNumbers();
+            return base.SaveChangesAsync(cancellationToken);
+        }
+
         private void ValidateDocumentRegistrationNumbers()
         {
             foreach (var entry in ChangeTracker.Entries<Document>()

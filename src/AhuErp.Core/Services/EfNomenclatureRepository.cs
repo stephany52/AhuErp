@@ -88,7 +88,7 @@ namespace AhuErp.Core.Services
                     {
                         TypeCode = normalizedCode,
                         Year = year,
-                        LastNumber = GetMaxSequenceFromDocuments(documentTypeRefId, year) + 1
+                        LastNumber = GetMaxSequenceFromDocuments(normalizedCode, year) + 1
                     };
                     _ctx.NomenclatureCounters.Add(counter);
                 }
@@ -103,23 +103,32 @@ namespace AhuErp.Core.Services
             }
         }
 
-        private int GetMaxSequenceFromDocuments(int documentTypeRefId, int year)
+        private int GetMaxSequenceFromDocuments(string typeCode, int year)
         {
-            var numbers = _ctx.Documents
-                .Where(d => d.DocumentTypeRefId == documentTypeRefId
-                            && d.RegistrationDate.HasValue
+            var documents = _ctx.Documents
+                .Include(d => d.DocumentTypeRef)
+                .Where(d => d.RegistrationDate.HasValue
                             && d.RegistrationDate.Value.Year == year
                             && d.RegistrationNumber != null)
-                .Select(d => d.RegistrationNumber)
                 .ToList();
 
             int max = 0;
-            foreach (var raw in numbers)
+            foreach (var doc in documents)
             {
-                var seq = ParseTrailingSequence(raw);
+                if (!string.Equals(ResolveTypeCode(doc.DocumentTypeRef), typeCode, StringComparison.Ordinal))
+                    continue;
+
+                var seq = ParseTrailingSequence(doc.RegistrationNumber);
                 if (seq > max) max = seq;
             }
             return max;
+        }
+
+        private static string ResolveTypeCode(DocumentTypeRef typeRef)
+        {
+            if (typeRef == null) return null;
+            var code = string.IsNullOrWhiteSpace(typeRef.ShortCode) ? typeRef.Name : typeRef.ShortCode;
+            return code?.Trim();
         }
 
         private static int ParseTrailingSequence(string registrationNumber)
