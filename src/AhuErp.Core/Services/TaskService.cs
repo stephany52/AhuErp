@@ -113,11 +113,13 @@ namespace AhuErp.Core.Services
         private Employee ResolveEmployeeByMention(string mention)
         {
             if (string.IsNullOrWhiteSpace(mention)) return null;
-            // Кандидаты: все активные сотрудники. Сжатый вид ФИО сравниваем
-            // case-insensitive: «ИвановИИ» ↔ "Иванов Иван Иванович".
+            // Кандидаты: только активные сотрудники (IsActive). Уволенные
+            // и деактивированные не должны получать уведомления о новых
+            // резолюциях. Сжатый вид ФИО сравниваем case-insensitive:
+            // «ИвановИИ» ↔ "Иванов Иван Иванович".
             foreach (var emp in _employees.ListAll())
             {
-                if (emp == null || string.IsNullOrWhiteSpace(emp.FullName)) continue;
+                if (emp == null || !emp.IsActive || string.IsNullOrWhiteSpace(emp.FullName)) continue;
                 var compact = CompactFullName(emp.FullName);
                 if (compact.Length == 0) continue;
                 if (string.Equals(compact, mention, StringComparison.OrdinalIgnoreCase))
