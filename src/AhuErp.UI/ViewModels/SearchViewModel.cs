@@ -38,6 +38,7 @@ namespace AhuErp.UI.ViewModels
         {
             null,
             DocumentStatus.New,
+            DocumentStatus.Registered,
             DocumentStatus.InProgress,
             DocumentStatus.OnHold,
             DocumentStatus.Completed,
