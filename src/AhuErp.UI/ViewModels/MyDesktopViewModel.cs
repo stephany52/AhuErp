@@ -197,9 +197,16 @@ namespace AhuErp.UI.ViewModels
             }
             else
             {
-                foreach (var n in Notifications)
+                // Notification — POCO без INotifyPropertyChanged: in-place
+                // мутация ReadAt не поднимет DataTrigger по IsRead. Чтобы
+                // карточки сразу затухли до Opacity 0.5, делаем Replace в
+                // ObservableCollection — ItemsControl пересоздаст контейнеры
+                // и DataTriggers перевычислятся по уже изменённому IsRead.
+                for (int i = 0; i < Notifications.Count; i++)
                 {
-                    if (!n.ReadAt.HasValue) n.ReadAt = now;
+                    var item = Notifications[i];
+                    if (!item.ReadAt.HasValue) item.ReadAt = now;
+                    Notifications[i] = item;
                 }
             }
             UnreadCount = _notifications.CountUnread(me.Id);
@@ -213,14 +220,21 @@ namespace AhuErp.UI.ViewModels
             if (n == null || me == null) return;
             _notifications.MarkRead(n.Id, me.Id);
 
-            // Локальное состояние держим консистентным с сервисом —
-            // ReadAt служит источником истины для IsRead и для DataTrigger
-            // в DataTemplate (тушит уже прочитанные карточки).
+            // Локальное состояние держим консистентным с сервисом.
             if (!n.ReadAt.HasValue) n.ReadAt = DateTime.Now;
 
             if (ShowOnlyUnread)
             {
                 Notifications.Remove(n);
+            }
+            else
+            {
+                // POCO Notification без INotifyPropertyChanged — DataTrigger
+                // по IsRead в DataTemplate не сработает на in-place мутации.
+                // Replace по индексу провоцирует ItemsControl переcоздать
+                // контейнер карточки с новой подсветкой.
+                var idx = Notifications.IndexOf(n);
+                if (idx >= 0) Notifications[idx] = n;
             }
 
             UnreadCount = _notifications.CountUnread(me.Id);
