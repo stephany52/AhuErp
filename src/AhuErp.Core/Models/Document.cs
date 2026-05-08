@@ -33,6 +33,16 @@ namespace AhuErp.Core.Models
 
         public DateTime? RegistrationDate { get; set; }
 
+        public static void ValidateRegistrationNumber(string registrationNumber)
+        {
+            if (!string.IsNullOrEmpty(registrationNumber)
+                && (registrationNumber.IndexOf('{') >= 0 || registrationNumber.IndexOf('}') >= 0))
+            {
+                throw new InvalidOperationException(
+                    "Регистрационный номер не может содержать шаблонные плейсхолдеры { или }. ");
+            }
+        }
+
         /// <summary>Справочный вид документа (приказ, служебная записка и т.д.).</summary>
         public int? DocumentTypeRefId { get; set; }
         public virtual DocumentTypeRef DocumentTypeRef { get; set; }

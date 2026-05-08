@@ -49,6 +49,7 @@ namespace AhuErp.Core.Services
         public void Add(Document document)
         {
             if (document == null) throw new ArgumentNullException(nameof(document));
+            Document.ValidateRegistrationNumber(document.RegistrationNumber);
             if (document.Id == 0) document.Id = _nextId++;
             else _nextId = Math.Max(_nextId, document.Id + 1);
             _documents.Add(document);
@@ -58,6 +59,7 @@ namespace AhuErp.Core.Services
         public void Update(Document document)
         {
             if (document == null) throw new ArgumentNullException(nameof(document));
+            Document.ValidateRegistrationNumber(document.RegistrationNumber);
             var index = _documents.FindIndex(d => d.Id == document.Id);
             if (index < 0)
                 throw new InvalidOperationException($"Документ #{document.Id} не найден.");

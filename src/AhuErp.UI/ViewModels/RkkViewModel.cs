@@ -343,6 +343,7 @@ namespace AhuErp.UI.ViewModels
                     _documents.Add(doc);
                     _audit.Record(AuditActionType.Created, nameof(Document), doc.Id,
                         _auth.CurrentEmployee?.Id, newValues: $"Title={doc.Title}");
+                    AutoRegisterOnSaveIfNeeded(doc);
                     Reload();
                     SelectedDocument = Documents.FirstOrDefault(d => d.Id == doc.Id);
                 }
@@ -360,7 +361,16 @@ namespace AhuErp.UI.ViewModels
                     _documents.Update(doc);
                     _audit.Record(AuditActionType.Updated, nameof(Document), doc.Id,
                         _auth.CurrentEmployee?.Id, newValues: $"Title={doc.Title}");
-                    ReloadHistory();
+                    if (AutoRegisterOnSaveIfNeeded(doc))
+                    {
+                        var docId = doc.Id;
+                        Reload();
+                        SelectedDocument = Documents.FirstOrDefault(d => d.Id == docId);
+                    }
+                    else
+                    {
+                        ReloadHistory();
+                    }
                 }
             }
             catch (Exception ex)
@@ -519,6 +529,15 @@ namespace AhuErp.UI.ViewModels
                 ReloadHistory();
             }
             catch (Exception ex) { ErrorMessage = ex.Message; }
+        }
+
+        private bool AutoRegisterOnSaveIfNeeded(Document doc)
+        {
+            if (!RolePolicy.AutoRegisterOnSave || doc == null || doc.IsRegistered || doc.IsLocked || !doc.DocumentTypeRefId.HasValue)
+                return false;
+
+            _nomenclature.Register(doc.Id, SelectedCase?.Id ?? doc.NomenclatureCaseId);
+            return true;
         }
 
         private bool HasSelectedDocument() => SelectedDocument != null;

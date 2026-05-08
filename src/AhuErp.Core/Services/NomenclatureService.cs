@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.Text.RegularExpressions;
 using AhuErp.Core.Models;
 
 namespace AhuErp.Core.Services
@@ -17,9 +16,6 @@ namespace AhuErp.Core.Services
     /// </summary>
     public sealed class NomenclatureService : INomenclatureService
     {
-        private static readonly Regex PlaceholderRegex = new Regex(
-            @"\{(?<name>[A-Za-z]+)(:(?<format>[^\}]+))?\}", RegexOptions.Compiled);
-
         private readonly INomenclatureRepository _repository;
         private readonly IDocumentRepository _documents;
         private readonly IAuditService _audit;
@@ -121,20 +117,19 @@ namespace AhuErp.Core.Services
 
             int sequence;
             string registrationNumber;
-            // Атомарно вычисляем следующую последовательность и формируем номер,
-            // защищая от гонки одновременной регистрации двух документов.
             lock (_sequenceSync)
             {
-                sequence = _repository.GetMaxSequence(typeRef.Id, year) + 1;
+                var typeCode = ResolveTypeCode(typeRef);
+                sequence = _repository.GetNextSequence(typeCode, typeRef.Id, year);
                 registrationNumber = BuildRegistrationNumber(typeRef, @case, year, sequence);
                 doc.RegistrationNumber = registrationNumber;
                 doc.RegistrationDate = DateTime.Now;
+                doc.Status = DocumentStatus.Registered;
                 if (@case != null)
                 {
                     doc.NomenclatureCaseId = @case.Id;
                 }
                 _documents.Update(doc);
-                _repository.BumpSequence(typeRef.Id, year, sequence);
             }
 
             _audit.Record(AuditActionType.Registered, nameof(Document), doc.Id, doc.AuthorId,
@@ -146,34 +141,20 @@ namespace AhuErp.Core.Services
         public string BuildRegistrationNumber(DocumentTypeRef typeRef, NomenclatureCase @case, int year, int sequence)
         {
             if (typeRef == null) throw new ArgumentNullException(nameof(typeRef));
-            var template = string.IsNullOrWhiteSpace(typeRef.RegistrationNumberTemplate)
-                ? "{Code}-{CaseIndex}/{Year}-{Sequence:00000}"
-                : typeRef.RegistrationNumberTemplate;
+            return string.Format(
+                CultureInfo.InvariantCulture,
+                "{0}-{1:0000}-{2:00000}",
+                ResolveTypeCode(typeRef),
+                year,
+                sequence);
+        }
 
-            return PlaceholderRegex.Replace(template, match =>
-            {
-                var name = match.Groups["name"].Value;
-                var format = match.Groups["format"].Success ? match.Groups["format"].Value : null;
-
-                switch (name)
-                {
-                    case "Code":
-                        return typeRef.ShortCode ?? typeRef.Name;
-                    case "CaseIndex":
-                        // Если документ зарегистрирован без привязки к делу
-                        // (caseId не указан) — заменяем плейсхолдер на «Б/Н»,
-                        // чтобы регномер сразу читался как «без номера дела»,
-                        // а не вводил пользователя в заблуждение шифром «00»
-                        // (см. дефект A13).
-                        return @case?.Index ?? "Б/Н";
-                    case "Year":
-                        return year.ToString(format ?? "0000", CultureInfo.InvariantCulture);
-                    case "Sequence":
-                        return sequence.ToString(format ?? "0", CultureInfo.InvariantCulture);
-                    default:
-                        return match.Value;
-                }
-            });
+        private static string ResolveTypeCode(DocumentTypeRef typeRef)
+        {
+            var code = string.IsNullOrWhiteSpace(typeRef.ShortCode) ? typeRef.Name : typeRef.ShortCode;
+            if (string.IsNullOrWhiteSpace(code))
+                throw new InvalidOperationException("Код вида документа обязателен для регистрации.");
+            return code.Trim();
         }
     }
 }

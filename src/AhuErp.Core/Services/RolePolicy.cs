@@ -48,6 +48,9 @@ namespace AhuErp.Core.Services
         // ---- Bug #6 / Improvement #9 — админ-панель (только Admin). ----
         public const string AdminPanel = nameof(AdminPanel);
 
+        // ---- Bug #1 — автоматическая регистрация РКК при сохранении. ----
+        public static bool AutoRegisterOnSave { get; set; } = true;
+
         /// <summary>
         /// Полный список ключей модулей, известных матрице. Используется
         /// тестами для проверки «каждый модуль покрыт хотя бы одной ролью».

@@ -73,5 +73,21 @@ namespace AhuErp.Tests
 
             Assert.Null(repo.GetById(doc.Id));
         }
+
+        [Theory]
+        [InlineData("СЗ-{YYYY}-{NNNNN}")]
+        [InlineData("ИСХ-2026-{00001}")]
+        public void Add_rejects_registration_number_templates(string registrationNumber)
+        {
+            var repo = new InMemoryDocumentRepository();
+            var doc = new Document
+            {
+                Type = DocumentType.Internal,
+                Title = "x",
+                RegistrationNumber = registrationNumber
+            };
+
+            Assert.Throws<System.InvalidOperationException>(() => repo.Add(doc));
+        }
     }
 }
