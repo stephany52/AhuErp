@@ -57,6 +57,7 @@ namespace AhuErp.Tests
         [InlineData(DocumentTypeFacet.ArchiveRequests)]
         [InlineData(DocumentTypeFacet.VehicleTrips)]
         [InlineData(DocumentTypeFacet.WriteOffs)]
+        [InlineData(DocumentTypeFacet.OfficeDocuments)]
         public void ToSearchFilter_subtype_facets_dont_set_direction(DocumentTypeFacet facet)
         {
             var f = new DocumentFilter { Type = facet };
@@ -309,10 +310,54 @@ namespace AhuErp.Tests
         }
 
         [Fact]
-        public void Preset_OfficeDocuments_filters_incoming()
+        public void Preset_OfficeDocuments_includes_incoming_and_internal()
         {
+            // Старый OfficeViewModel загружал ListByType(Incoming)
+            // .Concat(ListByType(Internal)). Пресет «Документационное
+            // обеспечение» должен сохранять это объединение.
             var f = RkkPresets.Build(RkkPreset.OfficeDocuments);
-            Assert.Equal(DocumentTypeFacet.Incoming, f.Type);
+            Assert.Equal(DocumentTypeFacet.OfficeDocuments, f.Type);
+        }
+
+        [Fact]
+        public void PostFilter_OfficeDocuments_keeps_incoming_and_internal_drops_outgoing()
+        {
+            // Регрессия: раньше пресет OfficeDocuments был
+            // = DocumentTypeFacet.Incoming, и внутренние документы
+            // выпадали из раздела. Теперь OfficeDocuments — это
+            // отдельный фасет с клиентским постфильтром.
+            var incoming = new Document
+            {
+                Id = 1,
+                Title = "ИФНС",
+                Direction = DocumentDirection.Incoming,
+                Type = DocumentType.Incoming,
+            };
+            var internalDoc = new Document
+            {
+                Id = 2,
+                Title = "Служебная записка",
+                Direction = DocumentDirection.Internal,
+                Type = DocumentType.Internal,
+            };
+            var outgoing = new Document
+            {
+                Id = 3,
+                Title = "Ответ внешнему адресату",
+                Direction = DocumentDirection.Outgoing,
+                Type = DocumentType.Office,
+            };
+
+            var f = new DocumentFilter { Type = DocumentTypeFacet.OfficeDocuments };
+            var result = f.ApplyClientSidePostFilters(
+                new[] { incoming, internalDoc, outgoing },
+                currentEmployeeId: null,
+                now: DateTime.Now);
+
+            Assert.Equal(2, result.Count);
+            Assert.Contains(result, d => d.Id == incoming.Id);
+            Assert.Contains(result, d => d.Id == internalDoc.Id);
+            Assert.DoesNotContain(result, d => d.Id == outgoing.Id);
         }
 
         [Fact]
@@ -340,8 +385,69 @@ namespace AhuErp.Tests
         [Fact]
         public void Preset_Journals_filters_registered_only()
         {
+            // Старый JournalViewModel использовал RegisteredOnly = true
+            // — журнал показывает все документы с непустым
+            // RegistrationNumber, независимо от их текущего статуса.
+            // Раньше пресет выставлял Status = Registered, что срезало
+            // документы, уже переведённые в InProgress / Completed.
             var f = RkkPresets.Build(RkkPreset.Journals);
-            Assert.Equal(DocumentStatusFacet.Registered, f.Status);
+            Assert.True(f.RegisteredOnly);
+            Assert.Equal(DocumentStatusFacet.All, f.Status);
+        }
+
+        [Fact]
+        public void ToSearchFilter_passes_through_RegisteredOnly()
+        {
+            var f = new DocumentFilter { RegisteredOnly = true };
+            var s = f.ToSearchFilter(currentEmployeeId: null);
+            Assert.True(s.RegisteredOnly);
+        }
+
+        [Fact]
+        public void Filter_Journals_via_repo_includes_registered_documents_in_any_status()
+        {
+            // Регрессия: «Журналы регистрации» раньше выставлял
+            // Status = Registered, и документ с рег. номером и статусом
+            // InProgress не попадал в журнал. Проверяем, что после
+            // перехода на RegisteredOnly журнал собирает все
+            // зарегистрированные документы.
+            var repo = new InMemoryDocumentRepository();
+            repo.Add(new Document
+            {
+                Title = "Договор поставки",
+                Direction = DocumentDirection.Outgoing,
+                Type = DocumentType.Office,
+                Status = DocumentStatus.InProgress,
+                CreationDate = new DateTime(2025, 1, 5),
+                RegistrationNumber = "ИСХ-1/2025",
+                RegistrationDate = new DateTime(2025, 1, 6),
+            });
+            repo.Add(new Document
+            {
+                Title = "Письмо ИФНС",
+                Direction = DocumentDirection.Incoming,
+                Type = DocumentType.Incoming,
+                Status = DocumentStatus.Completed,
+                CreationDate = new DateTime(2025, 1, 10),
+                RegistrationNumber = "ВХ-7/2025",
+                RegistrationDate = new DateTime(2025, 1, 11),
+            });
+            repo.Add(new Document
+            {
+                Title = "Черновик",
+                Direction = DocumentDirection.Internal,
+                Type = DocumentType.Internal,
+                Status = DocumentStatus.New,
+                CreationDate = new DateTime(2025, 1, 12),
+                // Без рег. номера — в журналы попасть не должен.
+            });
+
+            var f = RkkPresets.Build(RkkPreset.Journals);
+            var result = repo.Search(f.ToSearchFilter(null));
+
+            Assert.Equal(2, result.Count);
+            Assert.Contains(result, d => d.RegistrationNumber == "ИСХ-1/2025");
+            Assert.Contains(result, d => d.RegistrationNumber == "ВХ-7/2025");
         }
 
         [Fact]

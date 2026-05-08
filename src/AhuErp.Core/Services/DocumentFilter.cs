@@ -40,6 +40,15 @@ namespace AhuErp.Core.Services
         public DateTime? PeriodTo { get; set; }
 
         /// <summary>
+        /// Только документы с непустым <see cref="Document.RegistrationNumber"/>
+        /// (зарегистрированные). Прокидывается в
+        /// <see cref="DocumentSearchFilter.RegisteredOnly"/>. Используется
+        /// пресетом «Журналы регистрации»: журнал должен показывать всё,
+        /// что было зарегистрировано, независимо от текущего статуса.
+        /// </summary>
+        public bool RegisteredOnly { get; set; }
+
+        /// <summary>
         /// Перевод фасеточного фильтра в общий <see cref="DocumentSearchFilter"/>
         /// для серверной/инмемори-выборки. <paramref name="currentEmployeeId"/>
         /// нужен для фасета «Моя роль = Я исполнитель / Я автор».
@@ -52,6 +61,7 @@ namespace AhuErp.Core.Services
                 NomenclatureCaseId = NomenclatureCaseId,
                 From = PeriodFrom,
                 To = PeriodTo,
+                RegisteredOnly = RegisteredOnly,
             };
 
             switch (Type)
@@ -66,6 +76,7 @@ namespace AhuErp.Core.Services
                     f.Direction = DocumentDirection.Internal;
                     break;
                 case DocumentTypeFacet.All:
+                case DocumentTypeFacet.OfficeDocuments:
                 case DocumentTypeFacet.Contracts:
                 case DocumentTypeFacet.ServiceMemos:
                 case DocumentTypeFacet.ItTickets:
@@ -157,6 +168,14 @@ namespace AhuErp.Core.Services
 
             switch (Type)
             {
+                case DocumentTypeFacet.OfficeDocuments:
+                    // Старый раздел «Документационное обеспечение» показывал
+                    // и входящие, и внутренние документы (см. OfficeViewModel.
+                    // Reload). DocumentTypeFacet — single-value enum, поэтому
+                    // объединение направлений выражается на клиенте.
+                    q = q.Where(d => d.Direction == DocumentDirection.Incoming
+                                     || d.Direction == DocumentDirection.Internal);
+                    break;
                 case DocumentTypeFacet.Contracts:
                     q = q.Where(d => d.DocumentTypeRef != null
                                      && d.DocumentTypeRef.ShortCode != null
@@ -238,6 +257,13 @@ namespace AhuErp.Core.Services
         Incoming,
         Outgoing,
         Internal,
+
+        /// <summary>
+        /// Композитное значение «документационное обеспечение» —
+        /// объединение Incoming + Internal (старый раздел OfficeView).
+        /// </summary>
+        OfficeDocuments,
+
         Contracts,
         ServiceMemos,
         ItTickets,
@@ -320,7 +346,10 @@ namespace AhuErp.Core.Services
             switch (preset)
             {
                 case RkkPreset.OfficeDocuments:
-                    return new DocumentFilter { Type = DocumentTypeFacet.Incoming };
+                    // Документационное обеспечение = входящие + внутренние
+                    // (см. OfficeViewModel.Reload). Объединение направлений
+                    // выражено через DocumentTypeFacet.OfficeDocuments.
+                    return new DocumentFilter { Type = DocumentTypeFacet.OfficeDocuments };
                 case RkkPreset.MyTasks:
                     return new DocumentFilter
                     {
@@ -332,7 +361,10 @@ namespace AhuErp.Core.Services
                 case RkkPreset.ItService:
                     return new DocumentFilter { Type = DocumentTypeFacet.ItTickets };
                 case RkkPreset.Journals:
-                    return new DocumentFilter { Status = DocumentStatusFacet.Registered };
+                    // Журналы регистрации — все документы с непустым
+                    // RegistrationNumber, независимо от текущего статуса
+                    // (паритет с JournalViewModel.BuildFilter).
+                    return new DocumentFilter { RegisteredOnly = true };
                 case RkkPreset.Search:
                     return new DocumentFilter();
                 case RkkPreset.All:

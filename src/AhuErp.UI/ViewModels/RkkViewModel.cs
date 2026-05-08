@@ -467,6 +467,13 @@ namespace AhuErp.UI.ViewModels
         /// <summary>Сборка <see cref="DocumentFilter"/> из фасет-свойств VM.</summary>
         private DocumentFilter BuildCurrentFilter()
         {
+            // RegisteredOnly хранится не в фасет-свойствах, а в пресете
+            // («Журналы регистрации» выражается битом «только
+            // зарегистрированные»). Берём его из RkkPresets.Build(текущий
+            // пресет) — так флаг «живёт» ровно столько, сколько выбран
+            // пресет (и сбрасывается в ResetFilter вместе с CurrentPreset = All).
+            var presetBits = RkkPresets.Build(CurrentPreset);
+
             return new DocumentFilter
             {
                 Type = SelectedTypeFacet,
@@ -477,6 +484,7 @@ namespace AhuErp.UI.ViewModels
                 SearchText = SearchText,
                 PeriodFrom = AdvancedFromDate,
                 PeriodTo = AdvancedToDate,
+                RegisteredOnly = presetBits.RegisteredOnly,
             };
         }
 
@@ -503,6 +511,13 @@ namespace AhuErp.UI.ViewModels
                 FilterCase = filter.NomenclatureCaseId.HasValue
                     ? NomenclatureCases.FirstOrDefault(c => c.Id == filter.NomenclatureCaseId.Value)
                     : null;
+                // Сбрасываем свободные поля поиска при переключении
+                // пресета. Иначе текст/диапазон, оставленные пользователем
+                // в «Поиске», молча сужают выборку «Архивного отдела» /
+                // «Моих задач» / «ИТО» и результат становится непредсказуемым.
+                SearchText = null;
+                AdvancedFromDate = null;
+                AdvancedToDate = null;
                 IsAdvancedSearchOpen = preset == RkkPreset.Search;
             }
             finally
