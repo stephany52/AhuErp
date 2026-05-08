@@ -152,13 +152,37 @@ namespace AhuErp.UI.ViewModels
         /// </summary>
         public void NavigateToDocument(int documentId)
         {
+            // Bug #7. После унификации РКК несколько пунктов меню разделяют
+            // один RkkViewModel и переключают его на разные пресеты. Если
+            // взять «первый попавшийся» RKK-пункт, для роли без Office-доступа
+            // (HRAdmin, FleetManager и т.п.) это окажется «Мои задачи»
+            // (Executor + NotCompleted) или другой узкий пресет — и
+            // целевой документ выпадет из выборки, навигация молча
+            // провалится. Поэтому: 1) предпочитаем самый общий пункт
+            // «РКК (документы)» с RkkPreset.All; 2) если его роль не
+            // видит — берём любой доступный RKK-пункт и принудительно
+            // переводим фильтр на All, чтобы документ гарантированно
+            // оказался в Documents.
             var item = NavigationItems.FirstOrDefault(n =>
-                n.IsAllowed && n.ViewModel is RkkViewModel);
+                    n.IsAllowed && n.ViewModel is RkkViewModel
+                    && n.Preset == RkkPreset.All)
+                ?? NavigationItems.FirstOrDefault(n =>
+                    n.IsAllowed && n.ViewModel is RkkViewModel);
             if (item == null) return;
 
             SelectedNavigationItem = item;
 
             if (_rkkVm == null) return;
+
+            // Перестраховка: если попали на пункт с ограничивающим пресетом
+            // (Мои задачи / Архив / ИТО / Журналы / Поиск), отменяем его
+            // автоприменение и переводим РКК на All — иначе документ
+            // может быть невидим, хотя пользователь имеет к нему доступ.
+            if (item.Preset.HasValue && item.Preset.Value != RkkPreset.All)
+            {
+                _rkkVm.ApplyPreset(RkkPreset.All);
+            }
+
             if (_rkkVm.ReloadCommand.CanExecute(null))
                 _rkkVm.ReloadCommand.Execute(null);
             var doc = _rkkVm.Documents.FirstOrDefault(d => d.Id == documentId);
