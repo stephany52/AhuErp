@@ -22,12 +22,20 @@ namespace AhuErp.UI.Converters
             [VehicleStatus.OnMission] = "В рейсе",
             [VehicleStatus.Maintenance] = "На обслуживании",
 
-            [DocumentStatus.New] = "Новый",
+            // Phase 13: терминология приведена к 11 статусам гос-делопроизводства.
+            [DocumentStatus.New] = "Черновик",
             [DocumentStatus.InProgress] = "В работе",
             [DocumentStatus.OnHold] = "Приостановлен",
-            [DocumentStatus.Completed] = "Завершён",
+            [DocumentStatus.Completed] = "Исполнен",
             [DocumentStatus.Cancelled] = "Отменён",
             [DocumentStatus.Registered] = "Зарегистрирован",
+            [DocumentStatus.OnApproval] = "На согласовании",
+            [DocumentStatus.Approved] = "Согласован",
+            [DocumentStatus.Rejected] = "Отклонён",
+            [DocumentStatus.OnSigning] = "На подписании",
+            [DocumentStatus.Signed] = "Подписан",
+            [DocumentStatus.OnExecution] = "На исполнении",
+            [DocumentStatus.Archived] = "Передан в архив",
 
             [DocumentType.General] = "Общий",
             [DocumentType.Office] = "Документационное обеспечение",

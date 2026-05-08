@@ -119,9 +119,49 @@ AhuErp.sln
 | 10    | Полнотекстовый поиск                                | `AttachmentTextIndex`, `SavedSearch`, `SearchIndexService`, экстракторы `Pdf` / `Docx` / `PlainText`, фоновый `IndexOutdated` каждые 5 мин, миграция `AddSearchIndex` |
 | 11    | Оргструктура + замещения + делегирование задач      | Иерархия `Department`, `Substitution`, `TaskDelegation`, `SubstitutionService` подменяет исполнителя в `TaskService` / `ApprovalService` при активном замещении, миграция `AddOrgAndSubstitution` |
 | 12    | Регламентные отчёты + локализация UI                | Отчёты в XLSX / DOCX / PDF, русские подписи всех enum в UI и отчётах, `EnumDisplayConverter` |
+| 13    | Жизненный цикл документа по гос-делопроизводству     | `DocumentStatus` расширен до 11 значений (`Draft/Registered/OnApproval/Approved/Rejected/OnSigning/Signed/OnExecution/Completed/Cancelled/Archived`); `DocumentStateMachine.CanTransition(from,to[,role])` со «строгой» матрицей переходов и ролевыми ограничениями (Admin может всё валидное по графу; передача в архив — только Archivist/Manager/DeputyHead); `DocumentStateMachine.Transition` атомарно меняет статус и пишет `AuditActionType.StatusChanged`; интеграция в `NomenclatureService.Register` (Draft→Registered), `ApprovalService.StartApproval` (→OnApproval) и `ApplyDecision` (→Approved/Rejected), `SignatureService.Sign(Qualified)` (→Signed); `DocumentFilter.DocumentStatusFacet` дополнен `Rejected/OnSigning/Signed/Archived`; русская локализация новых статусов в `EnumDisplayConverter` |
 
 Дополнительная миграция `AddInventoryItemUnitAndMinimumBalance` добавляет
 поля единиц измерения и минимального остатка к `InventoryItem`.
+
+### Phase 13 — машина состояний документа
+
+Жизненный цикл соответствует ГОСТ Р 7.0.97-2016 и муниципальному
+делопроизводству. Допустимые переходы:
+
+```
+Draft (New) ───┬──► Registered ──┬──► OnApproval ──┬──► Approved ──┬──► OnSigning ──► Signed ──┬──► OnExecution ──┬──► Completed ──► Archived
+               │                 │                 │                │                          │                  │
+               │                 │                 │                ├──► OnExecution           ├──► Completed     │
+               │                 │                 │                ├──► Completed             ├──► Cancelled     │
+               │                 │                 │                └──► Cancelled             └──► OnHold ◄──────┘ (legacy)
+               │                 │                 │
+               │                 │                 └──► Rejected ──► Draft (на доработку) | Cancelled
+               │                 │
+               │                 └──► OnSigning | OnExecution | Completed | Cancelled | Archived
+               │
+               └──► OnApproval | Cancelled
+```
+
+`Cancelled` и `Archived` — терминальные. `InProgress` (legacy Phase 1-12) —
+синоним `OnExecution`, поддерживается для обратной совместимости при
+чтении старых записей.
+
+Ролевые ограничения (помимо логического графа):
+- **Admin** — все валидные по графу переходы (для расследований и
+  ручных коррекций).
+- **Manager / DeputyHead / Clerk / Archivist** — основной офисный поток
+  (регистрация, запуск согласования, отмена, передача в архив).
+- **Archivist** — монополия на `Completed → Archived` (помимо
+  Manager/DeputyHead).
+- **TechSupport / WarehouseManager / FleetManager** — могут завершать
+  свои `OnExecution` документы (`→ Completed` / `→ OnHold` / `→ Cancelled`).
+- **HRAdmin** — не управляет статусами документов.
+
+Любой переход через `DocumentStateMachine.Transition` пишет
+`AuditActionType.StatusChanged` с `OldValues=Status=From; NewValues=Status=To`
+и опциональным `Details` (причина), что покрывает требования к журналу
+аудита.
 
 ---
 

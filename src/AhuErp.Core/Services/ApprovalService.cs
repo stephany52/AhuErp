@@ -106,6 +106,15 @@ namespace AhuErp.Core.Services
             }
 
             doc.ApprovalStatus = ApprovalRouteStatus.InProgress;
+            // Phase 13: основной DocumentStatus также продвигается в OnApproval
+            // через машину состояний. Если документ ещё в Draft — переход
+            // New→OnApproval разрешён; если уже в OnApproval — нет действия.
+            // Если документ в неподходящем терминальном статусе — TryTransition
+            // тихо вернёт false (запуск маршрута и так упал бы по AppLogic выше).
+            DocumentStateMachine.TryTransition(
+                doc, DocumentStatus.OnApproval,
+                actorRole: null, actorId: actorId, _audit,
+                reason: $"Запущен маршрут «{template.Name}»");
             _documents.Update(doc);
 
             _audit.Record(AuditActionType.ApprovalSent, nameof(Document), doc.Id, actorId,
@@ -169,12 +178,25 @@ namespace AhuErp.Core.Services
             if (decision == ApprovalDecision.Rejected)
             {
                 doc.ApprovalStatus = ApprovalRouteStatus.Rejected;
+                // Phase 13: продвигаем основной DocumentStatus до Rejected,
+                // если документ сейчас на согласовании. TryTransition «тихо»
+                // пропускает, если документ уже в другом статусе.
+                DocumentStateMachine.TryTransition(
+                    doc, DocumentStatus.Rejected,
+                    actorRole: null, actorId: actorId, _audit,
+                    reason: $"Этап #{approval.Id} вернул на доработку");
                 _documents.Update(doc);
             }
             else if (all.All(a => a.Decision == ApprovalDecision.Approved
                                    || a.Decision == ApprovalDecision.Comments))
             {
                 doc.ApprovalStatus = ApprovalRouteStatus.Completed;
+                // Phase 13: маршрут завершён всеми Approved/Comments —
+                // основной DocumentStatus продвигается до Approved.
+                DocumentStateMachine.TryTransition(
+                    doc, DocumentStatus.Approved,
+                    actorRole: null, actorId: actorId, _audit,
+                    reason: "Маршрут согласования завершён без замечаний");
                 _documents.Update(doc);
                 _workflow?.OnApprovalRouteCompleted(doc.Id, actorId);
 

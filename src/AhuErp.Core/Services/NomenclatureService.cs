@@ -124,7 +124,17 @@ namespace AhuErp.Core.Services
                 registrationNumber = BuildRegistrationNumber(typeRef, @case, year, sequence);
                 doc.RegistrationNumber = registrationNumber;
                 doc.RegistrationDate = DateTime.Now;
-                doc.Status = DocumentStatus.Registered;
+                // Phase 13: статус меняется через DocumentStateMachine,
+                // чтобы запись StatusChanged попала в журнал аудита и
+                // нельзя было зарегистрировать документ из недопустимого
+                // состояния (например, уже Cancelled/Archived).
+                DocumentStateMachine.Transition(
+                    doc,
+                    DocumentStatus.Registered,
+                    actorRole: null,
+                    actorId: doc.AuthorId,
+                    _audit,
+                    reason: $"Регистрация № {registrationNumber}");
                 if (@case != null)
                 {
                     doc.NomenclatureCaseId = @case.Id;
