@@ -91,6 +91,7 @@ namespace AhuErp.UI.Converters
             [DocumentStatusFacet.Completed] = "Завершён",
             [DocumentStatusFacet.Cancelled] = "Отменён",
             [DocumentStatusFacet.Overdue] = "Просрочен",
+            [DocumentStatusFacet.NotCompleted] = "Не завершён",
 
             [DocumentRoleFacet.All] = "Все",
             [DocumentRoleFacet.Author] = "Я автор",

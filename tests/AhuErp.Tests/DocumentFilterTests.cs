@@ -258,6 +258,28 @@ namespace AhuErp.Tests
         }
 
         [Fact]
+        public void PostFilter_NextWeek_includes_monday_morning_of_next_week()
+        {
+            // Регрессионный тест: ранее startNext = EndOfWeek(now).AddDays(1)
+            // давал понедельник 23:59:59, и документ с дедлайном «понедельник
+            // 09:00 следующей недели» не попадал в выборку. После фикса
+            // startNext должен быть понедельник 00:00:00.
+            var now = new DateTime(2025, 9, 1, 10, 0, 0); // понедельник
+            var mondayMorningNextWeek = new Document
+            {
+                Id = 1,
+                Deadline = new DateTime(2025, 9, 8, 9, 0, 0),
+            };
+
+            var f = new DocumentFilter { Deadline = DocumentDeadlineFacet.NextWeek };
+            var result = f.ApplyClientSidePostFilters(
+                new[] { mondayMorningNextWeek }, null, now);
+
+            Assert.Single(result);
+            Assert.Equal(mondayMorningNextWeek.Id, result[0].Id);
+        }
+
+        [Fact]
         public void EndOfWeek_returns_sunday_2359_for_any_weekday()
         {
             // 2025-09-03 (среда) → конец недели = 2025-09-07 (воскресенье) 23:59:59.

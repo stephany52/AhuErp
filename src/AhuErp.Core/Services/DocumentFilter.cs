@@ -202,7 +202,10 @@ namespace AhuErp.Core.Services
                     }
                 case DocumentDeadlineFacet.NextWeek:
                     {
-                        var startNext = EndOfWeek(now).AddDays(1);
+                        // Старт следующей недели — понедельник 00:00:00.
+                        // EndOfWeek возвращает воскресенье 23:59:59, поэтому
+                        // .Date.AddDays(1) даёт ровно начало понедельника.
+                        var startNext = EndOfWeek(now).Date.AddDays(1);
                         var endNext = startNext.AddDays(6).Date.AddDays(1).AddSeconds(-1);
                         q = q.Where(d => d.Deadline != default
                                          && d.Deadline >= startNext
