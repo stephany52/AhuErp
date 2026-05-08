@@ -29,7 +29,12 @@ namespace AhuErp.Core.Services
 
         public IReadOnlyList<InventoryTransaction> ListTransactions(int? itemId = null)
         {
+            // Bug #5. Жадно подгружаем именованные навигации, иначе UI
+            // (DataGrid «Последние движения») рисует Id вместо названия
+            // позиции и регистрационного номера документа-основания.
             IQueryable<InventoryTransaction> q = _ctx.InventoryTransactions
+                .Include(t => t.InventoryItem)
+                .Include(t => t.Document)
                 .Include(t => t.Initiator);
             if (itemId.HasValue)
             {
