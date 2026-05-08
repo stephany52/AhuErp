@@ -6,67 +6,204 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d"
              d:DataContext="{d:DesignInstance Type=vm:ItServiceViewModel}"
-             d:DesignHeight="600" d:DesignWidth="1000">
+             d:DesignHeight="780" d:DesignWidth="1100">
+    <UserControl.Resources>
+        <Style x:Key="KpiTileStyle" TargetType="Border">
+            <Setter Property="Background" Value="White" />
+            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="Padding" Value="16,12" />
+            <Setter Property="Margin" Value="0,0,12,0" />
+            <Setter Property="MinWidth" Value="170" />
+            <Setter Property="BorderBrush" Value="#E5E7EB" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+    </UserControl.Resources>
     <Grid Margin="24">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <TextBlock Text="Служба по информационно-техническому обеспечению"
-                   FontSize="20" FontWeight="SemiBold" Margin="0,0,0,16" />
+                   FontSize="20" FontWeight="SemiBold" Margin="0,0,0,12" />
 
-        <DataGrid Grid.Row="1"
-                  ItemsSource="{Binding Tickets}"
-                  SelectedItem="{Binding SelectedTicket, UpdateSourceTrigger=PropertyChanged}"
-                  AutoGenerateColumns="False"
-                  CanUserAddRows="False" CanUserDeleteRows="False"
-                  IsReadOnly="True"
-                  HeadersVisibility="Column"
-                  GridLinesVisibility="Horizontal">
-            <DataGrid.RowStyle>
-                <Style TargetType="DataGridRow">
-                    <Setter Property="Background"
-                            Value="{Binding Converter={StaticResource OverdueRowColorConverter}}" />
-                </Style>
-            </DataGrid.RowStyle>
-            <DataGrid.Columns>
-                <DataGridTextColumn Header="№" Binding="{Binding Id}" Width="40" />
-                <DataGridTextColumn Header="Тема" Binding="{Binding Title}" Width="*" />
-                <DataGridTextColumn Header="Оборудование" Binding="{Binding AffectedEquipment}" Width="180" />
-                <DataGridTextColumn Header="Создан" Binding="{Binding CreationDate, StringFormat=dd.MM.yyyy}" Width="100" />
-                <DataGridTextColumn Header="Срок" Binding="{Binding Deadline, StringFormat=dd.MM.yyyy}" Width="100" />
-                <DataGridTextColumn Header="Статус" Binding="{Binding Status, Converter={StaticResource EnumDisplayConverter}}" Width="110" />
-            </DataGrid.Columns>
-        </DataGrid>
+        <!-- KPI tiles (Phase 14) -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,12">
+            <Border Style="{StaticResource KpiTileStyle}">
+                <StackPanel>
+                    <TextBlock Text="Открыто" Foreground="#6B7280" FontSize="12" />
+                    <TextBlock Text="{Binding KpiOpenCount}" FontSize="24" FontWeight="SemiBold" />
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource KpiTileStyle}">
+                <StackPanel>
+                    <TextBlock Text="В работе" Foreground="#6B7280" FontSize="12" />
+                    <TextBlock Text="{Binding KpiInProgressCount}" FontSize="24" FontWeight="SemiBold" Foreground="#1D4ED8" />
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource KpiTileStyle}">
+                <StackPanel>
+                    <TextBlock Text="Просрочено" Foreground="#6B7280" FontSize="12" />
+                    <TextBlock Text="{Binding KpiOverdueCount}" FontSize="24" FontWeight="SemiBold" Foreground="#DC2626" />
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource KpiTileStyle}">
+                <StackPanel>
+                    <TextBlock Text="В сервисе" Foreground="#6B7280" FontSize="12" />
+                    <TextBlock Text="{Binding KpiSentToVendorCount}" FontSize="24" FontWeight="SemiBold" Foreground="#9333EA" />
+                </StackPanel>
+            </Border>
+            <Border Style="{StaticResource KpiTileStyle}">
+                <StackPanel>
+                    <TextBlock Text="Средний MTTR" Foreground="#6B7280" FontSize="12" />
+                    <TextBlock Text="{Binding KpiMeanTimeToResolve}" FontSize="24" FontWeight="SemiBold" Foreground="#047857" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
 
-        <Border Grid.Row="2" Margin="0,16,0,0" Padding="16" Background="White" CornerRadius="4">
+        <TabControl Grid.Row="2" Padding="0">
+            <TabItem Header="Заявки">
+                <DataGrid ItemsSource="{Binding Tickets}"
+                          SelectedItem="{Binding SelectedTicket, UpdateSourceTrigger=PropertyChanged}"
+                          AutoGenerateColumns="False"
+                          CanUserAddRows="False" CanUserDeleteRows="False"
+                          IsReadOnly="True"
+                          HeadersVisibility="Column"
+                          GridLinesVisibility="Horizontal">
+                    <DataGrid.RowStyle>
+                        <Style TargetType="DataGridRow">
+                            <Setter Property="Background"
+                                    Value="{Binding Converter={StaticResource OverdueRowColorConverter}}" />
+                        </Style>
+                    </DataGrid.RowStyle>
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="№" Binding="{Binding Id}" Width="50" />
+                        <DataGridTextColumn Header="Тема" Binding="{Binding Title}" Width="*" />
+                        <DataGridTextColumn Header="Тип" Binding="{Binding Kind, Converter={StaticResource EnumDisplayConverter}}" Width="140" />
+                        <DataGridTextColumn Header="Оборудование" Binding="{Binding AffectedEquipment}" Width="180" />
+                        <DataGridTextColumn Header="Создан" Binding="{Binding CreationDate, StringFormat=dd.MM.yyyy}" Width="100" />
+                        <DataGridTextColumn Header="Срок" Binding="{Binding Deadline, StringFormat=dd.MM.yyyy}" Width="100" />
+                        <DataGridTextColumn Header="Статус" Binding="{Binding Status, Converter={StaticResource EnumDisplayConverter}}" Width="120" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </TabItem>
+
+            <TabItem Header="Каталог оборудования">
+                <DataGrid ItemsSource="{Binding EquipmentCatalog}"
+                          AutoGenerateColumns="False"
+                          CanUserAddRows="False" CanUserDeleteRows="False"
+                          IsReadOnly="True"
+                          HeadersVisibility="Column"
+                          GridLinesVisibility="Horizontal">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Инв. номер" Binding="{Binding InventoryNumber}" Width="120" />
+                        <DataGridTextColumn Header="Тип" Binding="{Binding Type, Converter={StaticResource EnumDisplayConverter}}" Width="140" />
+                        <DataGridTextColumn Header="Модель" Binding="{Binding Model}" Width="*" />
+                        <DataGridTextColumn Header="Серийник" Binding="{Binding SerialNumber}" Width="120" />
+                        <DataGridTextColumn Header="MAC" Binding="{Binding MacAddress}" Width="130" />
+                        <DataGridTextColumn Header="IP" Binding="{Binding IpAddress}" Width="120" />
+                        <DataGridTextColumn Header="Кабинет" Binding="{Binding Room}" Width="80" />
+                        <DataGridTextColumn Header="Гарантия" Binding="{Binding WarrantyExpiry, StringFormat=dd.MM.yyyy}" Width="100" />
+                        <DataGridTextColumn Header="Статус" Binding="{Binding Status, Converter={StaticResource EnumDisplayConverter}}" Width="110" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </TabItem>
+
+            <TabItem Header="Журнал диагностики">
+                <Grid Margin="0,4,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <DataGrid ItemsSource="{Binding DiagnosticEntries}"
+                              AutoGenerateColumns="False"
+                              CanUserAddRows="False" CanUserDeleteRows="False"
+                              IsReadOnly="True"
+                              HeadersVisibility="Column"
+                              GridLinesVisibility="Horizontal">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Дата/время" Binding="{Binding Timestamp, StringFormat=dd.MM.yyyy HH:mm}" Width="140" />
+                            <DataGridTextColumn Header="Категория" Binding="{Binding Category}" Width="140" />
+                            <DataGridTextColumn Header="Действие" Binding="{Binding Action}" Width="*" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <Border Grid.Row="1" Background="White" BorderBrush="#E5E7EB" BorderThickness="1"
+                            CornerRadius="4" Padding="12" Margin="0,8,0,0">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="160" />
+                                <ColumnDefinition Width="8" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="8" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox Text="{Binding DiagnosticCategory, UpdateSourceTrigger=PropertyChanged}"
+                                     Padding="6">
+                                <TextBox.ToolTip>Категория (опционально): Сеть / ПО / ВКС / ...</TextBox.ToolTip>
+                            </TextBox>
+                            <TextBox Grid.Column="2"
+                                     Text="{Binding DiagnosticAction, UpdateSourceTrigger=PropertyChanged}"
+                                     Padding="6">
+                                <TextBox.ToolTip>Действие: «Перезагрузил роутер», «Заменил патч-корд», ...</TextBox.ToolTip>
+                            </TextBox>
+                            <Button Grid.Column="4" Content="Добавить запись"
+                                    Command="{Binding AddDiagnosticCommand}"
+                                    MinWidth="140" Padding="8,6" />
+                        </Grid>
+                    </Border>
+                </Grid>
+            </TabItem>
+        </TabControl>
+
+        <Border Grid.Row="3" Margin="0,16,0,0" Padding="16" Background="White" CornerRadius="4">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="16" />
-                    <ColumnDefinition Width="360" />
+                    <ColumnDefinition Width="380" />
                 </Grid.ColumnDefinitions>
 
                 <StackPanel>
                     <TextBlock Text="Тема" />
                     <TextBox Text="{Binding DraftTitle, UpdateSourceTrigger=PropertyChanged}" Padding="6" />
 
-                    <TextBlock Text="Затронутое оборудование" Margin="0,8,0,0" />
+                    <Grid Margin="0,8,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="8" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="Тип заявки" />
+                            <ComboBox ItemsSource="{Binding Kinds}"
+                                      SelectedItem="{Binding DraftKind, UpdateSourceTrigger=PropertyChanged}"
+                                      ItemTemplate="{StaticResource EnumComboBoxItemTemplate}"
+                                      Padding="6" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Статус" />
+                            <ComboBox ItemsSource="{Binding Statuses}"
+                                      SelectedItem="{Binding DraftStatus, UpdateSourceTrigger=PropertyChanged}"
+                                      ItemTemplate="{StaticResource EnumComboBoxItemTemplate}"
+                                      Padding="6" />
+                        </StackPanel>
+                    </Grid>
+
+                    <TextBlock Text="Оборудование (каталог)" Margin="0,8,0,0" />
+                    <ComboBox ItemsSource="{Binding EquipmentCatalog}"
+                              SelectedItem="{Binding DraftEquipmentRef, UpdateSourceTrigger=PropertyChanged}"
+                              DisplayMemberPath="InventoryNumber"
+                              IsEditable="False"
+                              Padding="6" />
+
+                    <TextBlock Text="Затронутое оборудование (свободный текст, для устройств не из каталога)" Margin="0,8,0,0" />
                     <TextBox Text="{Binding DraftAffectedEquipment, UpdateSourceTrigger=PropertyChanged}" Padding="6" />
 
                     <TextBlock Text="Заметки по решению" Margin="0,8,0,0" />
                     <TextBox Text="{Binding DraftResolutionNotes, UpdateSourceTrigger=PropertyChanged}"
                              Padding="6" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="60" />
-
-                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                        <TextBlock Text="Статус" VerticalAlignment="Center" />
-                        <ComboBox ItemsSource="{Binding Statuses}"
-                                  SelectedItem="{Binding DraftStatus, UpdateSourceTrigger=PropertyChanged}"
-                                  ItemTemplate="{StaticResource EnumComboBoxItemTemplate}"
-                                  MinWidth="160" Margin="8,0,0,0" Padding="6" />
-                    </StackPanel>
 
                     <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
                         <Button Content="Новая"     Command="{Binding NewCommand}"    MinWidth="90" Padding="8,6" Margin="0,0,6,0" />
@@ -75,35 +212,63 @@
                     </StackPanel>
                 </StackPanel>
 
-                <Border Grid.Column="2" BorderBrush="#E5E7EB" BorderThickness="1" CornerRadius="4" Padding="12">
-                    <StackPanel>
-                        <TextBlock Text="Закрытие заявки" FontWeight="SemiBold" />
-                        <TextBlock Text="Опционально спишите расходник со склада — движение привяжется к этой заявке."
-                                   FontSize="11" Foreground="#6B7280" TextWrapping="Wrap" Margin="0,2,0,8" />
+                <StackPanel Grid.Column="2">
+                    <Border BorderBrush="#E5E7EB" BorderThickness="1" CornerRadius="4" Padding="12">
+                        <StackPanel>
+                            <TextBlock Text="Закрытие заявки" FontWeight="SemiBold" />
+                            <TextBlock Text="Опционально спишите расходник со склада — движение привяжется к этой заявке."
+                                       FontSize="11" Foreground="#6B7280" TextWrapping="Wrap" Margin="0,2,0,8" />
 
-                        <TextBlock Text="ТМЦ" />
-                        <ComboBox ItemsSource="{Binding Items}"
-                                  DisplayMemberPath="Name"
-                                  SelectedItem="{Binding ConsumedItem, UpdateSourceTrigger=PropertyChanged}"
-                                  Padding="6" />
+                            <TextBlock Text="ТМЦ" />
+                            <ComboBox ItemsSource="{Binding Items}"
+                                      DisplayMemberPath="Name"
+                                      SelectedItem="{Binding ConsumedItem, UpdateSourceTrigger=PropertyChanged}"
+                                      Padding="6" />
 
-                        <TextBlock Text="Количество" Margin="0,8,0,0" />
-                        <TextBox Text="{Binding ConsumedQuantity, UpdateSourceTrigger=PropertyChanged}" Padding="6" />
+                            <TextBlock Text="Количество" Margin="0,8,0,0" />
+                            <TextBox Text="{Binding ConsumedQuantity, UpdateSourceTrigger=PropertyChanged}" Padding="6" />
 
-                        <Button Content="Закрыть заявку"
-                                Command="{Binding ResolveCommand}"
-                                MinWidth="140" Padding="8,6" Margin="0,12,0,0" />
+                            <Button Content="Закрыть заявку"
+                                    Command="{Binding ResolveCommand}"
+                                    MinWidth="140" Padding="8,6" Margin="0,12,0,0" />
+                        </StackPanel>
+                    </Border>
 
-                        <TextBlock Text="{Binding ErrorMessage}"
-                                   Foreground="#DC2626" Margin="0,8,0,0"
-                                   Visibility="{Binding ErrorMessage, Converter={StaticResource StringToVisibilityConverter}}"
-                                   TextWrapping="Wrap" />
-                        <TextBlock Text="{Binding StatusMessage}"
-                                   Foreground="#047857" Margin="0,8,0,0"
-                                   Visibility="{Binding StatusMessage, Converter={StaticResource StringToVisibilityConverter}}"
-                                   TextWrapping="Wrap" />
-                    </StackPanel>
-                </Border>
+                    <Border BorderBrush="#E5E7EB" BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,12,0,0">
+                        <StackPanel>
+                            <TextBlock Text="Передача в сервис" FontWeight="SemiBold" />
+                            <TextBlock Text="Используется, когда требуется выезд сервисного инженера / отправка к поставщику."
+                                       FontSize="11" Foreground="#6B7280" TextWrapping="Wrap" Margin="0,2,0,8" />
+
+                            <TextBlock Text="Поставщик услуг" />
+                            <TextBox Text="{Binding VendorName, UpdateSourceTrigger=PropertyChanged}" Padding="6" />
+
+                            <TextBlock Text="Номер заявки у поставщика" Margin="0,8,0,0" />
+                            <TextBox Text="{Binding VendorTicketNumber, UpdateSourceTrigger=PropertyChanged}" Padding="6" />
+
+                            <TextBlock Text="Срок возврата" Margin="0,8,0,0" />
+                            <DatePicker SelectedDate="{Binding VendorReturnDeadline, UpdateSourceTrigger=PropertyChanged}" />
+
+                            <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                <Button Content="Передать в сервис"
+                                        Command="{Binding SendToVendorCommand}"
+                                        MinWidth="150" Padding="8,6" Margin="0,0,6,0" />
+                                <Button Content="Возврат"
+                                        Command="{Binding ReturnFromVendorCommand}"
+                                        MinWidth="100" Padding="8,6" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <TextBlock Text="{Binding ErrorMessage}"
+                               Foreground="#DC2626" Margin="0,8,0,0"
+                               Visibility="{Binding ErrorMessage, Converter={StaticResource StringToVisibilityConverter}}"
+                               TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding StatusMessage}"
+                               Foreground="#047857" Margin="0,8,0,0"
+                               Visibility="{Binding StatusMessage, Converter={StaticResource StringToVisibilityConverter}}"
+                               TextWrapping="Wrap" />
+                </StackPanel>
             </Grid>
         </Border>
     </Grid>

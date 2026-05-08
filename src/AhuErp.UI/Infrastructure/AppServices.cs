@@ -126,6 +126,13 @@ namespace AhuErp.UI.Infrastructure
                 sp.GetRequiredService<ISavedSearchRepository>(),
                 sp.GetRequiredService<IAuditService>()));
 
+            // Phase 14 — каталог оборудования, журнал диагностики, ВКС, KPI ИТО.
+            services.AddSingleton<IEquipmentRepository, EfEquipmentRepository>();
+            services.AddSingleton<INetworkSegmentRepository, EfNetworkSegmentRepository>();
+            services.AddSingleton<IVideoConferenceRepository, EfVideoConferenceRepository>();
+            services.AddSingleton<IItTicketDiagnosticRepository, EfItTicketDiagnosticRepository>();
+            services.AddSingleton<IItServiceMetricsProvider, ItServiceMetricsProvider>();
+
             services.AddSingleton<IReportService>(sp => new ReportService(
                 sp.GetRequiredService<IInventoryRepository>(),
                 sp.GetRequiredService<IDocumentRepository>(),
