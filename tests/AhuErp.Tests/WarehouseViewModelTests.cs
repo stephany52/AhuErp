@@ -194,6 +194,58 @@ namespace AhuErp.Tests
         }
 
         [Fact]
+        public void FilterCategory_works_when_InventoryItem_navigation_is_null()
+        {
+            // Bug #5 (review). Регрессия: фильтр по категории должен срабатывать
+            // даже когда t.InventoryItem == null (в проде это случается, если
+            // EF6 .Include() не отработал или данные пришли из стороннего
+            // источника). Используем стаб-репозиторий, который на каждом
+            // ListTransactions() возвращает свежие копии InventoryTransaction
+            // с null-навигациями — это эмулирует EF без Include.
+            var stubInv = new StubInventoryRepository();
+            stubInv.AddItem(new InventoryItem
+            {
+                Id = 10,
+                Name = "Расходник IT",
+                Category = InventoryCategory.IT_Equipment,
+                Unit = "шт.",
+                TotalQuantity = 5
+            });
+            stubInv.AddItem(new InventoryItem
+            {
+                Id = 11,
+                Name = "Канцелярия",
+                Category = InventoryCategory.Stationery,
+                Unit = "шт.",
+                TotalQuantity = 5
+            });
+            stubInv.RecordTransaction(new InventoryTransaction
+            {
+                InventoryItemId = 10,
+                QuantityChanged = 1,
+                InitiatorId = _supply.Id,
+                TransactionDate = DateTime.Now
+            });
+            stubInv.RecordTransaction(new InventoryTransaction
+            {
+                InventoryItemId = 11,
+                QuantityChanged = 1,
+                InitiatorId = _supply.Id,
+                TransactionDate = DateTime.Now.AddSeconds(1)
+            });
+
+            var vm = new WarehouseViewModel(stubInv, new InventoryService(stubInv),
+                                            _documents, _auth, _reports, _fileDialog, _employees);
+            vm.FilterCategory = InventoryCategory.IT_Equipment;
+
+            // Без фикса фильтр выкидывал ВСЕ транзакции (т.к. t.InventoryItem
+            // был null до foreach-патчинга). С фиксом — остаётся ровно одна
+            // транзакция с InventoryItemId == 10.
+            Assert.Single(vm.RecentTransactions);
+            Assert.Equal(10, vm.RecentTransactions[0].InventoryItemId);
+        }
+
+        [Fact]
         public void ClearFiltersCommand_resets_all_filters_and_repopulates_full_journal()
         {
             _inventoryService.ProcessTransaction(_paper.Id, 5, null, _supply.Id);
@@ -254,6 +306,59 @@ namespace AhuErp.Tests
         {
             public string PromptSaveFile(string title, string filter, string defaultFileName) => null;
             public string PromptOpenFile(string title, string filter) => null;
+        }
+
+        /// <summary>
+        /// Стаб-репозиторий, эмулирующий поведение EF6 без правильно
+        /// настроенного <c>.Include()</c>: каждая <c>ListTransactions()</c>
+        /// возвращает СВЕЖИЕ копии <see cref="InventoryTransaction"/> с
+        /// null-навигациями. Это вскрывает фильтры, которые ошибочно
+        /// полагаются на <c>t.InventoryItem != null</c>.
+        /// </summary>
+        private sealed class StubInventoryRepository : IInventoryRepository
+        {
+            private readonly List<InventoryItem> _items = new List<InventoryItem>();
+            private readonly List<InventoryTransaction> _transactions = new List<InventoryTransaction>();
+            private int _nextItemId = 1;
+            private int _nextTxId = 1;
+
+            public IReadOnlyList<InventoryItem> ListItems() => _items.ToList();
+
+            public InventoryItem GetItem(int itemId) =>
+                _items.FirstOrDefault(i => i.Id == itemId);
+
+            public IReadOnlyList<InventoryTransaction> ListTransactions(int? itemId = null)
+            {
+                IEnumerable<InventoryTransaction> q = _transactions;
+                if (itemId.HasValue) q = q.Where(t => t.InventoryItemId == itemId.Value);
+                return q.OrderByDescending(t => t.TransactionDate)
+                        .Select(t => new InventoryTransaction
+                        {
+                            Id = t.Id,
+                            InventoryItemId = t.InventoryItemId,
+                            QuantityChanged = t.QuantityChanged,
+                            DocumentId = t.DocumentId,
+                            BasisDocumentId = t.BasisDocumentId,
+                            InitiatorId = t.InitiatorId,
+                            TransactionDate = t.TransactionDate
+                        })
+                        .ToList()
+                        .AsReadOnly();
+            }
+
+            public void AddItem(InventoryItem item)
+            {
+                if (item.Id == 0) item.Id = _nextItemId++;
+                else _nextItemId = Math.Max(_nextItemId, item.Id + 1);
+                _items.Add(item);
+            }
+
+            public void RecordTransaction(InventoryTransaction transaction)
+            {
+                if (transaction.Id == 0) transaction.Id = _nextTxId++;
+                else _nextTxId = Math.Max(_nextTxId, transaction.Id + 1);
+                _transactions.Add(transaction);
+            }
         }
     }
 }

@@ -290,8 +290,19 @@ namespace AhuErp.UI.ViewModels
             if (FilterTo.HasValue)
                 filtered = filtered.Where(t => t.TransactionDate < FilterTo.Value.Date.AddDays(1));
             if (FilterCategory.HasValue)
-                filtered = filtered.Where(t => t.InventoryItem != null
-                                               && t.InventoryItem.Category == FilterCategory.Value);
+            {
+                // Bug #5 (review): не полагаемся на t.InventoryItem, так как
+                // навигация может быть не наполнена ни EF6 .Include(), ни
+                // последующим foreach-патчингом (он выполняется ПОСЛЕ Where).
+                // Делаем явный lookup по FK — это согласуется с тем, как
+                // FilterInitiator фильтрует по t.InitiatorId.
+                var category = FilterCategory.Value;
+                filtered = filtered.Where(t =>
+                {
+                    var item = t.InventoryItem ?? _inventory.GetItem(t.InventoryItemId);
+                    return item != null && item.Category == category;
+                });
+            }
             if (FilterInitiator != null)
                 filtered = filtered.Where(t => t.InitiatorId == FilterInitiator.Id);
 
