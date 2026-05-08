@@ -125,7 +125,17 @@
 
         <Border Grid.Row="2" Grid.Column="1" Background="White" CornerRadius="4" Padding="8" Margin="0,8,0,0">
             <DockPanel>
-                <TextBlock DockPanel.Dock="Top" Text="Уведомления" FontWeight="SemiBold" Margin="4,4,4,8" />
+                <Grid DockPanel.Dock="Top" Margin="4,4,4,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="Уведомления" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    <CheckBox Grid.Column="1"
+                              Content="Только непрочитанные"
+                              IsChecked="{Binding ShowOnlyUnread, Mode=TwoWay}"
+                              VerticalAlignment="Center" />
+                </Grid>
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <ItemsControl ItemsSource="{Binding Notifications}">
                         <ItemsControl.ItemTemplate>
@@ -133,6 +143,22 @@
                                 <Border BorderBrush="#E0E0E0" BorderThickness="0,0,0,1"
                                         Padding="6,8" Margin="0,0,0,4"
                                         Cursor="Hand">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Opacity" Value="1.0" />
+                                            <Style.Triggers>
+                                                <!-- Bug #2: тушим прочитанные (когда ShowOnlyUnread=false
+                                                     и они в ленте) и уведомления о просроченных
+                                                     поручениях, чтобы фокус оставался на актуальном. -->
+                                                <DataTrigger Binding="{Binding IsRead}" Value="True">
+                                                    <Setter Property="Opacity" Value="0.5" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Kind}" Value="TaskOverdue">
+                                                    <Setter Property="Opacity" Value="0.5" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
                                     <Border.InputBindings>
                                         <MouseBinding MouseAction="LeftDoubleClick"
                                                       Command="{Binding DataContext.OpenDocumentCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
