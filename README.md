@@ -120,6 +120,7 @@ AhuErp.sln
 | 11    | Оргструктура + замещения + делегирование задач      | Иерархия `Department`, `Substitution`, `TaskDelegation`, `SubstitutionService` подменяет исполнителя в `TaskService` / `ApprovalService` при активном замещении, миграция `AddOrgAndSubstitution` |
 | 12    | Регламентные отчёты + локализация UI                | Отчёты в XLSX / DOCX / PDF, русские подписи всех enum в UI и отчётах, `EnumDisplayConverter` |
 | 13    | Жизненный цикл документа по гос-делопроизводству     | `DocumentStatus` расширен до 11 значений (`Draft/Registered/OnApproval/Approved/Rejected/OnSigning/Signed/OnExecution/Completed/Cancelled/Archived`); `DocumentStateMachine.CanTransition(from,to[,role])` со «строгой» матрицей переходов и ролевыми ограничениями (Admin может всё валидное по графу; передача в архив — только Archivist/Manager/DeputyHead); `DocumentStateMachine.Transition` атомарно меняет статус и пишет `AuditActionType.StatusChanged`; интеграция в `NomenclatureService.Register` (Draft→Registered), `ApprovalService.StartApproval` (→OnApproval) и `ApplyDecision` (→Approved/Rejected), `SignatureService.Sign(Qualified)` (→Signed); `DocumentFilter.DocumentStatusFacet` дополнен `Rejected/OnSigning/Signed/Archived`; русская локализация новых статусов в `EnumDisplayConverter` |
+| 14    | Расширение модуля ИТО (системный администратор)      | Каталог `Equipment` (инв. №, тип/статус/MAC/IP/кабинет/ответственный/гарантия), справочник `NetworkSegment` (VLAN/диапазон/маска/шлюз/DNS), журнал `VideoConference` (тема/площадка Zoom/Jitsi/RegionalVks/ссылка/организатор/участники), хронологический `ItTicketDiagnosticEntry`, расширение `ItTicket` (`Kind`, `AffectedEquipmentId` FK, `IsSentToVendor` + поставщик/№ заявки/срок возврата, `CompletedAt`); KPI-плитки на дашборде ИТО (`IItServiceMetricsProvider`: Open/InProgress/Overdue/SentToVendor/CompletedCount/MTTR); миграция `AddItoExpansionPhase14` (4 новые таблицы + 6 колонок к `Documents`) |
 
 Дополнительная миграция `AddInventoryItemUnitAndMinimumBalance` добавляет
 поля единиц измерения и минимального остатка к `InventoryItem`.
@@ -162,6 +163,80 @@ Draft (New) ───┬──► Registered ──┬──► OnApproval ─�
 `AuditActionType.StatusChanged` с `OldValues=Status=From; NewValues=Status=To`
 и опциональным `Details` (причина), что покрывает требования к журналу
 аудита.
+
+### Phase 14 — расширение модуля ИТО (системный администратор)
+
+Покрывает должностную инструкцию системного администратора МКУ «АХУ» БМР
+(мелкий ремонт, диагностика и передача в сервис, установка/сопровождение
+ПО, ВКС, администрирование сайта, настройка сети). Раздел «ИТО»
+переработан под помощника инженера: KPI-дашборд, каталог техники, журнал
+диагностики, передача внешнему поставщику, журнал ВКС.
+
+**Новые модели (`AhuErp.Core/Models`):**
+- `Equipment` — каталог техники: `InventoryNumber`, `Type`
+  (`EquipmentType`: Pc/Printer/Switch/AccessPoint/IpPhone/IpCamera/Server/
+  VideoConferenceUnit/Ups/Other), `Model`, `SerialNumber`, `MacAddress`,
+  `IpAddress`, `Room`, `ResponsibleEmployeeId`, `InServiceDate`,
+  `WarrantyExpiry`, `Status` (`EquipmentStatus`:
+  Working/InRepair/Decommissioned), `NetworkSegmentId`, `Notes`.
+- `NetworkSegment` — справочник сегментов сети: `Name`, `Vlan`,
+  `IpRange`, `SubnetMask`, `Gateway`, `Dns`, `Notes`. Привязывается к
+  `Equipment.NetworkSegmentId`.
+- `VideoConference` — журнал ВКС: `Topic`, `ScheduledAt`, `CompletedAt`,
+  `OrganizerId`, `Participants`, `Platform`
+  (`VideoConferencePlatform`: Zoom/Jitsi/RegionalVks), `MeetingUrl`,
+  `Notes`, `TicketId` (FK на `ItTicket` для подготовительной заявки).
+- `ItTicketDiagnosticEntry` — хронологический журнал диагностики:
+  `TicketId`, `AuthorId`, `Timestamp`, `Action`, `Category`. Каждое
+  действие («Перезагрузил роутер», «Заменил патч-корд», «Передал в
+  сервис») сохраняется отдельной записью.
+
+**Расширение `ItTicket` (Phase 14):**
+- `Kind` (`ItTicketKind`: HardwareRepair/SoftwareInstall/NetworkConfig/
+  VideoConference/WebsiteAdmin/UserConsult) — классификатор типа заявки.
+- `AffectedEquipmentId` (FK → `Equipment`) + `AffectedEquipmentRef`
+  (legacy `AffectedEquipment` строкой оставлен для обратной совместимости).
+- `IsSentToVendor` + `VendorName` + `VendorTicketNumber` +
+  `VendorReturnDeadline` — передача в сервис внешнему поставщику.
+  Семантически статус = `OnHold` (ожидает внешнего действия) +
+  `IsSentToVendor=true`.
+- `CompletedAt` — момент закрытия заявки (для расчёта MTTR).
+- `DiagnosticEntries` — навигационная коллекция к
+  `ItTicketDiagnosticEntry`.
+
+**Сервисы и репозитории:**
+- `IEquipmentRepository` / `INetworkSegmentRepository` /
+  `IVideoConferenceRepository` / `IItTicketDiagnosticRepository` —
+  стандартный CRUD, EF6 + InMemory реализации.
+- `IItServiceMetricsProvider` → `ItServiceMetricsProvider` — считает
+  KPI из `IDocumentRepository.ListItTickets()`:
+  `OpenCount`/`InProgressCount`/`OverdueCount`/`SentToVendorCount`/
+  `CompletedCount`/`MeanTimeToResolve` (среднее
+  `CompletedAt - CreationDate` по закрытым заявкам).
+
+**UI (`ItServiceView` / `ItServiceViewModel`):**
+- Полоса из 5 KPI-плиток (Открытых / В работе / Просрочено / У поставщика /
+  Среднее время решения) с авто-пересчётом через `RecomputeKpi()` после
+  каждой загрузки.
+- TabControl «Заявки / Каталог техники / Журнал диагностики» с
+  отдельными гридами и формами добавления.
+- Карточка заявки: блок «Передача в сервис» (поставщик, № заявки,
+  срок возврата) появляется при `IsSentToVendor=true`; кнопки
+  «Передать в сервис» / «Вернуть из сервиса» меняют `IsSentToVendor` и
+  `DocumentStatus` (OnHold ⇄ InProgress) с записью в журнал диагностики.
+- Формат MTTR: `«1 д 04:30»` или `«04:30»` (метод `FormatMttr`).
+
+**Миграция `AddItoExpansionPhase14`:**
+- Создаёт таблицы `Equipment`, `NetworkSegments`, `VideoConferences`,
+  `ItTicketDiagnosticEntries` со всеми FK.
+- Расширяет `Documents` колонками `AffectedEquipmentId`, `Kind`,
+  `IsSentToVendor`, `VendorName`, `VendorTicketNumber`,
+  `VendorReturnDeadline`, `CompletedAt`.
+- FK с `ON DELETE NO ACTION` на `Equipment` (от `Documents` и от
+  `NetworkSegments`).
+
+**RBAC:** доступ к разделу «ИТО» — `Admin / Manager / TechSupport /
+DeputyHead` (без изменений в политике, расширение существующего раздела).
 
 ---
 

@@ -132,6 +132,14 @@ BEGIN
         ArchiveRequestKind     INT             NULL,
         AffectedEquipment      NVARCHAR(256)   NULL,
         ResolutionNotes        NVARCHAR(1024)  NULL,
+        /* Phase 14: расширение модуля ИТО — каталог оборудования + поставщик + MTTR */
+        AffectedEquipmentId    INT             NULL,
+        Kind                   INT             NOT NULL CONSTRAINT DF_Documents_Kind DEFAULT (0),
+        IsSentToVendor         BIT             NOT NULL CONSTRAINT DF_Documents_IsSentToVendor DEFAULT (0),
+        VendorName             NVARCHAR(256)   NULL,
+        VendorTicketNumber     NVARCHAR(64)    NULL,
+        VendorReturnDeadline   DATETIME        NULL,
+        CompletedAt            DATETIME        NULL,
         DocumentDiscriminator  NVARCHAR(128)   NOT NULL,
         CONSTRAINT PK_dbo_Documents PRIMARY KEY CLUSTERED (Id ASC)
     );
@@ -515,7 +523,115 @@ BEGIN
 END
 GO
 
-/* ---------- 15. (необязательно) лёгкий сид-набор для проверки ------------- */
+/* ---------- 15. NetworkSegments (Phase 14) -------------------------------- */
+IF OBJECT_ID(N'dbo.NetworkSegments', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.NetworkSegments
+    (
+        Id           INT             IDENTITY(1, 1) NOT NULL,
+        [Name]       NVARCHAR(128)   NOT NULL,
+        Vlan         NVARCHAR(32)    NULL,
+        IpRange      NVARCHAR(64)    NULL,
+        SubnetMask   NVARCHAR(64)    NULL,
+        Gateway      NVARCHAR(64)    NULL,
+        Dns          NVARCHAR(128)   NULL,
+        Notes        NVARCHAR(1024)  NULL,
+        CONSTRAINT PK_dbo_NetworkSegments PRIMARY KEY CLUSTERED (Id ASC)
+    );
+END
+GO
+
+/* ---------- 16. Equipment (Phase 14) -------------------------------------- */
+IF OBJECT_ID(N'dbo.Equipment', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.Equipment
+    (
+        Id                     INT             IDENTITY(1, 1) NOT NULL,
+        InventoryNumber        NVARCHAR(64)    NOT NULL,
+        [Type]                 INT             NOT NULL CONSTRAINT DF_Equipment_Type DEFAULT (0),
+        Model                  NVARCHAR(256)   NULL,
+        SerialNumber           NVARCHAR(128)   NULL,
+        MacAddress             NVARCHAR(32)    NULL,
+        IpAddress              NVARCHAR(64)    NULL,
+        Room                   NVARCHAR(128)   NULL,
+        ResponsibleEmployeeId  INT             NULL,
+        InServiceDate          DATETIME        NULL,
+        WarrantyExpiry         DATETIME        NULL,
+        [Status]               INT             NOT NULL CONSTRAINT DF_Equipment_Status DEFAULT (0),
+        NetworkSegmentId       INT             NULL,
+        Notes                  NVARCHAR(1024)  NULL,
+        CONSTRAINT PK_dbo_Equipment PRIMARY KEY CLUSTERED (Id ASC),
+        CONSTRAINT [FK_dbo.Equipment_dbo.Employees_ResponsibleEmployeeId]
+            FOREIGN KEY (ResponsibleEmployeeId) REFERENCES dbo.Employees (Id),
+        CONSTRAINT [FK_dbo.Equipment_dbo.NetworkSegments_NetworkSegmentId]
+            FOREIGN KEY (NetworkSegmentId) REFERENCES dbo.NetworkSegments (Id)
+    );
+    CREATE NONCLUSTERED INDEX IX_Equipment_ResponsibleEmployeeId ON dbo.Equipment (ResponsibleEmployeeId);
+    CREATE NONCLUSTERED INDEX IX_Equipment_NetworkSegmentId      ON dbo.Equipment (NetworkSegmentId);
+
+    /* Document.AffectedEquipmentId FK к Equipment (после создания таблицы Equipment) */
+    IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE [name] = N'FK_dbo.Documents_dbo.Equipment_AffectedEquipmentId')
+    BEGIN
+        ALTER TABLE dbo.Documents
+            ADD CONSTRAINT [FK_dbo.Documents_dbo.Equipment_AffectedEquipmentId]
+            FOREIGN KEY (AffectedEquipmentId)
+            REFERENCES dbo.Equipment (Id);
+        CREATE NONCLUSTERED INDEX IX_Documents_AffectedEquipmentId ON dbo.Documents (AffectedEquipmentId);
+    END
+END
+GO
+
+/* ---------- 17. ItTicketDiagnosticEntries (Phase 14) ---------------------- */
+IF OBJECT_ID(N'dbo.ItTicketDiagnosticEntries', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.ItTicketDiagnosticEntries
+    (
+        Id         INT             IDENTITY(1, 1) NOT NULL,
+        TicketId   INT             NOT NULL,
+        AuthorId   INT             NULL,
+        Timestamp  DATETIME        NOT NULL,
+        Action     NVARCHAR(1024)  NOT NULL,
+        Category   NVARCHAR(128)   NULL,
+        CONSTRAINT PK_dbo_ItTicketDiagnosticEntries PRIMARY KEY CLUSTERED (Id ASC),
+        CONSTRAINT [FK_dbo.ItTicketDiagnosticEntries_dbo.Documents_TicketId]
+            FOREIGN KEY (TicketId) REFERENCES dbo.Documents (Id) ON DELETE CASCADE,
+        CONSTRAINT [FK_dbo.ItTicketDiagnosticEntries_dbo.Employees_AuthorId]
+            FOREIGN KEY (AuthorId) REFERENCES dbo.Employees (Id)
+    );
+    CREATE NONCLUSTERED INDEX IX_ItTicketDiagnosticEntries_TicketId  ON dbo.ItTicketDiagnosticEntries (TicketId);
+    CREATE NONCLUSTERED INDEX IX_ItTicketDiagnosticEntries_AuthorId  ON dbo.ItTicketDiagnosticEntries (AuthorId);
+    CREATE NONCLUSTERED INDEX IX_ItTicketDiagnosticEntries_Timestamp ON dbo.ItTicketDiagnosticEntries (Timestamp);
+END
+GO
+
+/* ---------- 18. VideoConferences (Phase 14) ------------------------------- */
+IF OBJECT_ID(N'dbo.VideoConferences', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.VideoConferences
+    (
+        Id            INT             IDENTITY(1, 1) NOT NULL,
+        Topic         NVARCHAR(256)   NOT NULL,
+        ScheduledAt   DATETIME        NOT NULL,
+        CompletedAt   DATETIME        NULL,
+        OrganizerId   INT             NULL,
+        Participants  NVARCHAR(2048)  NULL,
+        Platform      INT             NOT NULL CONSTRAINT DF_VideoConferences_Platform DEFAULT (0),
+        MeetingUrl    NVARCHAR(512)   NULL,
+        Notes         NVARCHAR(1024)  NULL,
+        TicketId      INT             NULL,
+        CONSTRAINT PK_dbo_VideoConferences PRIMARY KEY CLUSTERED (Id ASC),
+        CONSTRAINT [FK_dbo.VideoConferences_dbo.Employees_OrganizerId]
+            FOREIGN KEY (OrganizerId) REFERENCES dbo.Employees (Id),
+        CONSTRAINT [FK_dbo.VideoConferences_dbo.Documents_TicketId]
+            FOREIGN KEY (TicketId) REFERENCES dbo.Documents (Id)
+    );
+    CREATE NONCLUSTERED INDEX IX_VideoConferences_OrganizerId ON dbo.VideoConferences (OrganizerId);
+    CREATE NONCLUSTERED INDEX IX_VideoConferences_TicketId    ON dbo.VideoConferences (TicketId);
+    CREATE NONCLUSTERED INDEX IX_VideoConferences_ScheduledAt ON dbo.VideoConferences (ScheduledAt);
+END
+GO
+
+/* ---------- 19. (необязательно) лёгкий сид-набор для проверки ------------- */
 /* Расскоментируй блок ниже, если хочешь сразу получить несколько строк.
  * Пароль 'password' берётся из DemoDataSeeder; реальный хеш выставляет
  * приложение при первом запуске — здесь оставляем PasswordHash = NULL,

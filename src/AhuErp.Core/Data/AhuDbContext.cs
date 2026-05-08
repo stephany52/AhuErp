@@ -67,6 +67,12 @@ namespace AhuErp.Core.Data
         public virtual DbSet<Notification> Notifications { get; set; }
         public virtual DbSet<NotificationPreference> NotificationPreferences { get; set; }
 
+        // Phase 14 / Improvement #10 — каталог оборудования и журналы ИТО.
+        public virtual DbSet<Equipment> Equipment { get; set; }
+        public virtual DbSet<NetworkSegment> NetworkSegments { get; set; }
+        public virtual DbSet<VideoConference> VideoConferences { get; set; }
+        public virtual DbSet<ItTicketDiagnosticEntry> ItTicketDiagnosticEntries { get; set; }
+
         public override int SaveChanges()
         {
             ValidateDocumentRegistrationNumbers();
@@ -442,6 +448,51 @@ namespace AhuErp.Core.Data
                 .HasRequired(x => x.Owner)
                 .WithMany()
                 .HasForeignKey(x => x.OwnerId)
+                .WillCascadeOnDelete(false);
+
+            // Phase 14 — каталог оборудования и связанные сущности ИТО.
+            modelBuilder.Entity<NetworkSegment>().ToTable("NetworkSegments");
+
+            modelBuilder.Entity<Equipment>().ToTable("Equipment");
+            modelBuilder.Entity<Equipment>()
+                .HasOptional(e => e.ResponsibleEmployee)
+                .WithMany()
+                .HasForeignKey(e => e.ResponsibleEmployeeId)
+                .WillCascadeOnDelete(false);
+            modelBuilder.Entity<Equipment>()
+                .HasOptional(e => e.NetworkSegment)
+                .WithMany(s => s.Equipment)
+                .HasForeignKey(e => e.NetworkSegmentId)
+                .WillCascadeOnDelete(false);
+
+            modelBuilder.Entity<ItTicket>()
+                .HasOptional(t => t.AffectedEquipmentRef)
+                .WithMany(e => e.Tickets)
+                .HasForeignKey(t => t.AffectedEquipmentId)
+                .WillCascadeOnDelete(false);
+
+            modelBuilder.Entity<ItTicketDiagnosticEntry>().ToTable("ItTicketDiagnosticEntries");
+            modelBuilder.Entity<ItTicketDiagnosticEntry>()
+                .HasRequired(d => d.Ticket)
+                .WithMany(t => t.DiagnosticEntries)
+                .HasForeignKey(d => d.TicketId)
+                .WillCascadeOnDelete(true);
+            modelBuilder.Entity<ItTicketDiagnosticEntry>()
+                .HasRequired(d => d.Author)
+                .WithMany()
+                .HasForeignKey(d => d.AuthorId)
+                .WillCascadeOnDelete(false);
+
+            modelBuilder.Entity<VideoConference>().ToTable("VideoConferences");
+            modelBuilder.Entity<VideoConference>()
+                .HasOptional(v => v.Ticket)
+                .WithMany()
+                .HasForeignKey(v => v.TicketId)
+                .WillCascadeOnDelete(false);
+            modelBuilder.Entity<VideoConference>()
+                .HasRequired(v => v.Organizer)
+                .WithMany()
+                .HasForeignKey(v => v.OrganizerId)
                 .WillCascadeOnDelete(false);
 
             base.OnModelCreating(modelBuilder);
