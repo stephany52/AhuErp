@@ -20,6 +20,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\AhuErp.Core\AhuErp.Core.csproj" />
+    <!-- Bug #5: тестам на WarehouseViewModel и InventoryDeltaSignConverter
+         нужен доступ к проекту AhuErp.UI. WPF UI как окна в xunit не
+         запускается, но типы ViewModel и IValueConverter загружаются и
+         покрываются обычными unit-тестами. -->
+    <ProjectReference Include="..\..\src\AhuErp.UI\AhuErp.UI.csproj" />
   </ItemGroup>
 
 </Project>

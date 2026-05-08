@@ -13,6 +13,7 @@
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <TextBlock Text="Склад / ТМЦ"
@@ -106,20 +107,88 @@
 
         <TextBlock Grid.Row="2" Text="Последние движения" FontWeight="SemiBold" Margin="0,16,0,6" />
 
-        <DataGrid Grid.Row="3"
+        <!-- Bug #5. Фильтры журнала движений: дата с/по, категория позиции, инициатор. -->
+        <Grid Grid.Row="3" Margin="0,0,0,6">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="6" />
+                <ColumnDefinition Width="140" />
+                <ColumnDefinition Width="6" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="6" />
+                <ColumnDefinition Width="140" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="6" />
+                <ColumnDefinition Width="180" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="6" />
+                <ColumnDefinition Width="200" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Grid.Column="0" Text="С:" VerticalAlignment="Center" />
+            <DatePicker Grid.Column="2" SelectedDate="{Binding FilterFrom, UpdateSourceTrigger=PropertyChanged}" />
+
+            <TextBlock Grid.Column="4" Text="По:" VerticalAlignment="Center" />
+            <DatePicker Grid.Column="6" SelectedDate="{Binding FilterTo, UpdateSourceTrigger=PropertyChanged}" />
+
+            <TextBlock Grid.Column="8" Text="Категория:" VerticalAlignment="Center" />
+            <ComboBox Grid.Column="10"
+                      ItemsSource="{Binding CategoryFilterOptions}"
+                      SelectedItem="{Binding FilterCategory, UpdateSourceTrigger=PropertyChanged}"
+                      ItemTemplate="{StaticResource EnumComboBoxItemTemplate}" />
+
+            <TextBlock Grid.Column="12" Text="Инициатор:" VerticalAlignment="Center" />
+            <ComboBox Grid.Column="14"
+                      ItemsSource="{Binding InitiatorOptions}"
+                      DisplayMemberPath="FullName"
+                      SelectedItem="{Binding FilterInitiator, UpdateSourceTrigger=PropertyChanged}" />
+
+            <Button Grid.Column="16" Content="Сбросить"
+                    Command="{Binding ClearFiltersCommand}" Padding="8,4" />
+        </Grid>
+
+        <DataGrid Grid.Row="4"
                   ItemsSource="{Binding RecentTransactions}"
                   AutoGenerateColumns="False"
                   CanUserAddRows="False" CanUserDeleteRows="False"
                   IsReadOnly="True"
                   HeadersVisibility="Column"
                   GridLinesVisibility="Horizontal"
-                  MaxHeight="160">
+                  MaxHeight="180">
             <DataGrid.Columns>
-                <DataGridTextColumn Header="Дата"      Binding="{Binding TransactionDate, StringFormat=dd.MM.yyyy HH:mm}" Width="140" />
-                <DataGridTextColumn Header="Позиция №" Binding="{Binding InventoryItemId}" Width="100" />
-                <DataGridTextColumn Header="Δ"         Binding="{Binding QuantityChanged}" Width="60" />
-                <DataGridTextColumn Header="Документ № " Binding="{Binding DocumentId}"    Width="120" />
-                <DataGridTextColumn Header="Инициатор" Binding="{Binding Initiator.FullName, FallbackValue='—'}" Width="180" />
+                <DataGridTextColumn Header="Дата"
+                                    Binding="{Binding TransactionDate, StringFormat=dd.MM.yyyy HH:mm}"
+                                    Width="140" />
+                <DataGridTextColumn Header="Тип операции"
+                                    Binding="{Binding QuantityChanged, Converter={StaticResource InventoryDeltaSignConverter}, ConverterParameter=Label}"
+                                    Width="110">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="FontWeight" Value="SemiBold" />
+                            <Setter Property="Foreground"
+                                    Value="{Binding QuantityChanged, Converter={StaticResource InventoryDeltaSignConverter}, ConverterParameter=Foreground}" />
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+                <DataGridTextColumn Header="Позиция"
+                                    Binding="{Binding InventoryItem.Name, FallbackValue='—'}"
+                                    Width="*" />
+                <DataGridTextColumn Header="Δ"
+                                    Binding="{Binding QuantityChanged}"
+                                    Width="60" />
+                <DataGridTextColumn Header="Документ"
+                                    Binding="{Binding Document.RegistrationNumber, FallbackValue='—'}"
+                                    Width="140" />
+                <DataGridTextColumn Header="Название"
+                                    Binding="{Binding Document.Title, FallbackValue='—'}"
+                                    Width="*" />
+                <DataGridTextColumn Header="Инициатор"
+                                    Binding="{Binding Initiator.FullName, FallbackValue='—'}"
+                                    Width="180" />
             </DataGrid.Columns>
         </DataGrid>
     </Grid>

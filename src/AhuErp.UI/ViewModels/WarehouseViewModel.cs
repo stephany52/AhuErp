@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
@@ -34,6 +35,20 @@ namespace AhuErp.UI.ViewModels
         public InventoryCategory[] Categories { get; } =
             (InventoryCategory[])Enum.GetValues(typeof(InventoryCategory));
 
+        // Bug #5. Источник для фильтра «Категория» — все категории + псевдо-NULL,
+        // чтобы пользователь мог быстро сбросить фильтр одним кликом.
+        public IReadOnlyList<InventoryCategory?> CategoryFilterOptions { get; } =
+            new List<InventoryCategory?> { null }
+                .Concat(((InventoryCategory[])Enum.GetValues(typeof(InventoryCategory)))
+                            .Cast<InventoryCategory?>())
+                .ToList();
+
+        // Bug #5. Источник для фильтра «Инициатор». Заполняется в Reload()
+        // из набора фактических авторов транзакций (а не из всего штата),
+        // чтобы выпадающий список был коротким и осмысленным.
+        public ObservableCollection<Employee> InitiatorOptions { get; }
+            = new ObservableCollection<Employee>();
+
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(DeductCommand))]
         [NotifyCanExecuteChangedFor(nameof(RestockCommand))]
@@ -66,6 +81,22 @@ namespace AhuErp.UI.ViewModels
 
         [ObservableProperty]
         private int newItemMinimumBalance;
+
+        // Bug #5. Фильтры журнала движений. Применяются в Reload() поверх
+        // выборки из репозитория (репозиторий уже отдаёт ВСЕ движения вместе
+        // с навигациями Item/Document/Initiator); ограничение Take(20)
+        // применяется уже после фильтрации.
+        [ObservableProperty]
+        private DateTime? filterFrom;
+
+        [ObservableProperty]
+        private DateTime? filterTo;
+
+        [ObservableProperty]
+        private InventoryCategory? filterCategory;
+
+        [ObservableProperty]
+        private Employee filterInitiator;
 
         public WarehouseViewModel(IInventoryRepository inventory,
                                   IInventoryService inventoryService,
@@ -105,6 +136,22 @@ namespace AhuErp.UI.ViewModels
 
         [RelayCommand]
         private void Refresh() => Reload();
+
+        // Bug #5. Сброс всех фильтров журнала движений за один клик.
+        [RelayCommand]
+        private void ClearFilters()
+        {
+            FilterFrom = null;
+            FilterTo = null;
+            FilterCategory = null;
+            FilterInitiator = null;
+            Reload();
+        }
+
+        partial void OnFilterFromChanged(DateTime? value) => Reload();
+        partial void OnFilterToChanged(DateTime? value) => Reload();
+        partial void OnFilterCategoryChanged(InventoryCategory? value) => Reload();
+        partial void OnFilterInitiatorChanged(Employee value) => Reload();
 
         [RelayCommand(CanExecute = nameof(CanAddItem))]
         private void AddItem()
@@ -202,6 +249,7 @@ namespace AhuErp.UI.ViewModels
         {
             var itemId = SelectedItem?.Id;
             var docId = SelectedDocument?.Id;
+            var initiatorId = FilterInitiator?.Id;
 
             Items.Clear();
             foreach (var it in _inventory.ListItems().OrderBy(i => i.Name))
@@ -212,11 +260,52 @@ namespace AhuErp.UI.ViewModels
                                           .OrderByDescending(d => d.CreationDate))
                 EligibleDocuments.Add(doc);
 
+            // Bug #5. Репозиторий теперь жадно подгружает Item/Document/Initiator
+            // (см. EfInventoryRepository.ListTransactions). Здесь применяем
+            // фильтры (диапазон дат, категория позиции, инициатор) и только
+            // потом обрезаем до 20 последних, чтобы не отбрасывать релевантные
+            // строки из-за дешёвого Take().
+            var allTransactions = _inventory.ListTransactions();
+
+            // Источник для ComboBox «Инициатор» — только реальные авторы.
+            var distinctInitiators = allTransactions
+                .Where(t => t.Initiator != null
+                            || (t.InitiatorId > 0 && _employees.GetById(t.InitiatorId) != null))
+                .Select(t => t.Initiator ?? _employees.GetById(t.InitiatorId))
+                .Where(e => e != null)
+                .GroupBy(e => e.Id)
+                .Select(g => g.First())
+                .OrderBy(e => e.FullName)
+                .ToList();
+
+            InitiatorOptions.Clear();
+            foreach (var emp in distinctInitiators)
+                InitiatorOptions.Add(emp);
+
+            FilterInitiator = InitiatorOptions.FirstOrDefault(e => e.Id == initiatorId);
+
+            IEnumerable<InventoryTransaction> filtered = allTransactions;
+            if (FilterFrom.HasValue)
+                filtered = filtered.Where(t => t.TransactionDate >= FilterFrom.Value.Date);
+            if (FilterTo.HasValue)
+                filtered = filtered.Where(t => t.TransactionDate < FilterTo.Value.Date.AddDays(1));
+            if (FilterCategory.HasValue)
+                filtered = filtered.Where(t => t.InventoryItem != null
+                                               && t.InventoryItem.Category == FilterCategory.Value);
+            if (FilterInitiator != null)
+                filtered = filtered.Where(t => t.InitiatorId == FilterInitiator.Id);
+
             RecentTransactions.Clear();
-            foreach (var tx in _inventory.ListTransactions().Take(20))
+            foreach (var tx in filtered.Take(20))
             {
+                // Подстраховка для InMemory-репо или старых данных, у которых
+                // навигации могут оставаться пустыми после .Include().
                 if (tx.Initiator == null && tx.InitiatorId > 0)
                     tx.Initiator = _employees.GetById(tx.InitiatorId);
+                if (tx.InventoryItem == null && tx.InventoryItemId > 0)
+                    tx.InventoryItem = _inventory.GetItem(tx.InventoryItemId);
+                if (tx.Document == null && tx.DocumentId.HasValue)
+                    tx.Document = _documents.GetById(tx.DocumentId.Value);
                 RecentTransactions.Add(tx);
             }
 
