@@ -1,4 +1,5 @@
 using System;
+using AhuErp.Core.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace AhuErp.UI.ViewModels
@@ -16,10 +17,23 @@ namespace AhuErp.UI.ViewModels
 
         public ViewModelBase ViewModel { get; }
 
+        /// <summary>
+        /// Bug #7. Если задан — пункт меню работает как «сохранённый пресет
+        /// фильтров РКК»: при выборе MainViewModel переключает CurrentViewModel
+        /// на <see cref="RkkViewModel"/> и применяет соответствующий фильтр
+        /// через <see cref="RkkViewModel.ApplyPreset(RkkPreset)"/>.
+        /// </summary>
+        public RkkPreset? Preset { get; }
+
         [ObservableProperty]
         private bool isAllowed;
 
         public NavigationItem(string title, string moduleKey, ViewModelBase viewModel)
+            : this(title, moduleKey, viewModel, null)
+        {
+        }
+
+        public NavigationItem(string title, string moduleKey, ViewModelBase viewModel, RkkPreset? preset)
         {
             if (string.IsNullOrWhiteSpace(title))
                 throw new ArgumentException("Название пункта меню не может быть пустым.", nameof(title));
@@ -28,6 +42,7 @@ namespace AhuErp.UI.ViewModels
             Title = title;
             ModuleKey = moduleKey;
             ViewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
+            Preset = preset;
         }
     }
 }

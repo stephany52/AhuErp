@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
@@ -246,6 +247,76 @@ namespace AhuErp.UI.ViewModels
         [ObservableProperty]
         private string errorMessage;
 
+        // ---------------- Bug #7. Фасеточный фильтр + пресеты РКК ----------
+
+        public DocumentTypeFacet[] TypeFacets { get; } =
+            (DocumentTypeFacet[])Enum.GetValues(typeof(DocumentTypeFacet));
+
+        public DocumentStatusFacet[] StatusFacets { get; } =
+            (DocumentStatusFacet[])Enum.GetValues(typeof(DocumentStatusFacet));
+
+        public DocumentRoleFacet[] RoleFacets { get; } =
+            (DocumentRoleFacet[])Enum.GetValues(typeof(DocumentRoleFacet));
+
+        public DocumentDeadlineFacet[] DeadlineFacets { get; } =
+            (DocumentDeadlineFacet[])Enum.GetValues(typeof(DocumentDeadlineFacet));
+
+        [ObservableProperty]
+        private DocumentTypeFacet selectedTypeFacet = DocumentTypeFacet.All;
+
+        [ObservableProperty]
+        private DocumentStatusFacet selectedStatusFacet = DocumentStatusFacet.All;
+
+        [ObservableProperty]
+        private DocumentRoleFacet selectedRoleFacet = DocumentRoleFacet.All;
+
+        [ObservableProperty]
+        private DocumentDeadlineFacet selectedDeadlineFacet = DocumentDeadlineFacet.All;
+
+        [ObservableProperty]
+        private NomenclatureCase filterCase;
+
+        /// <summary>Полнотекстовая строка поиска в шапке РКК.</summary>
+        [ObservableProperty]
+        private string searchText;
+
+        /// <summary>Включён ли поп-ап «Расширенный поиск».</summary>
+        [ObservableProperty]
+        private bool isAdvancedSearchOpen;
+
+        /// <summary>Нижняя граница периода для расширенного поиска.</summary>
+        [ObservableProperty]
+        private DateTime? advancedFromDate;
+
+        /// <summary>Верхняя граница периода для расширенного поиска.</summary>
+        [ObservableProperty]
+        private DateTime? advancedToDate;
+
+        /// <summary>Текущий выбранный пресет (отображается в шапке).</summary>
+        [ObservableProperty]
+        private RkkPreset currentPreset = RkkPreset.All;
+
+        /// <summary>
+        /// Карточка-описание текущего пресета — что именно показывает РКК.
+        /// Биндится в подзаголовке окна (см. RkkView.xaml).
+        /// </summary>
+        public string PresetDisplay
+        {
+            get
+            {
+                switch (CurrentPreset)
+                {
+                    case RkkPreset.OfficeDocuments: return "Документационное обеспечение";
+                    case RkkPreset.MyTasks: return "Мои задачи";
+                    case RkkPreset.Archive: return "Архивный отдел";
+                    case RkkPreset.ItService: return "ИТО";
+                    case RkkPreset.Journals: return "Журналы регистрации";
+                    case RkkPreset.Search: return "Поиск";
+                    default: return "Все документы";
+                }
+            }
+        }
+
         public RkkViewModel(
             IDocumentRepository documents,
             INomenclatureService nomenclature,
@@ -279,6 +350,14 @@ namespace AhuErp.UI.ViewModels
 
             Reload();
         }
+
+        partial void OnCurrentPresetChanged(RkkPreset value) => OnPropertyChanged(nameof(PresetDisplay));
+
+        partial void OnSelectedTypeFacetChanged(DocumentTypeFacet value) { if (!_suppressFilterReload) ApplyFilter(); }
+        partial void OnSelectedStatusFacetChanged(DocumentStatusFacet value) { if (!_suppressFilterReload) ApplyFilter(); }
+        partial void OnSelectedRoleFacetChanged(DocumentRoleFacet value) { if (!_suppressFilterReload) ApplyFilter(); }
+        partial void OnSelectedDeadlineFacetChanged(DocumentDeadlineFacet value) { if (!_suppressFilterReload) ApplyFilter(); }
+        partial void OnFilterCaseChanged(NomenclatureCase value) { if (!_suppressFilterReload) ApplyFilter(); }
 
         partial void OnSelectedDocumentChanged(Document value)
         {
@@ -328,16 +407,153 @@ namespace AhuErp.UI.ViewModels
             foreach (var rt in _approvals.ListTemplates(activeOnly: true)
                                           .OrderBy(t => t.Name))
                 RouteTemplates.Add(rt);
-            Documents.Clear();
-            // Загружаем все «офисные» направления документов.
-            foreach (var d in _documents.ListByType(DocumentType.Internal)
-                                       .Concat(_documents.ListByType(DocumentType.Office))
-                                       .Concat(_documents.ListByType(DocumentType.Incoming))
-                                       .OrderByDescending(d => d.CreationDate))
-            {
-                Documents.Add(d);
-            }
+
+            // Bug #7 — выборка документов теперь идёт через DocumentFilter,
+            // а не "вручную по DocumentType". Это позволяет одному и тому же
+            // экрану обслуживать пресеты «Документационное обеспечение»,
+            // «Мои задачи», «Архивный отдел», «ИТО», «Журналы регистрации»
+            // и «Поиск».
+            ApplyFilter();
         }
+
+        /// <summary>
+        /// Bug #7. Перечитывает <see cref="Documents"/> через текущий
+        /// <see cref="DocumentFilter"/>, собранный из фасет-свойств VM.
+        /// Учитывает клиентские пост-фильтры (<see cref="DocumentRoleFacet.Approver"/>,
+        /// <see cref="DocumentRoleFacet.Signer"/>, <see cref="DocumentDeadlineFacet"/>).
+        /// </summary>
+        [RelayCommand]
+        public void ApplyFilter()
+        {
+            ErrorMessage = null;
+            var filter = BuildCurrentFilter();
+            var meId = _auth?.CurrentEmployee?.Id;
+            var search = filter.ToSearchFilter(meId);
+
+            IEnumerable<Document> matched;
+            try
+            {
+                matched = _documents.Search(search);
+            }
+            catch (NotImplementedException)
+            {
+                // Совместимость со старыми реализациями репозитория.
+                matched = _documents.ListByType(DocumentType.Internal)
+                                     .Concat(_documents.ListByType(DocumentType.Office))
+                                     .Concat(_documents.ListByType(DocumentType.Incoming));
+            }
+
+            // Approver / Signer — постфильтр через подсобные репозитории.
+            if (filter.MyRole == DocumentRoleFacet.Approver && meId.HasValue)
+            {
+                var meIdValue = meId.Value;
+                matched = matched.Where(d => _approvals.ListByDocument(d.Id)
+                                                       .Any(a => a.ApproverId == meIdValue));
+            }
+            else if (filter.MyRole == DocumentRoleFacet.Signer && meId.HasValue && _signatures != null)
+            {
+                var meIdValue = meId.Value;
+                matched = matched.Where(d => _signatures.ListByDocument(d.Id)
+                                                       .Any(s => !s.IsRevoked && s.SignerId == meIdValue));
+            }
+
+            var post = filter.ApplyClientSidePostFilters(matched, meId, DateTime.Now);
+
+            Documents.Clear();
+            foreach (var d in post.OrderByDescending(d => d.RegistrationDate ?? d.CreationDate))
+                Documents.Add(d);
+        }
+
+        /// <summary>Сборка <see cref="DocumentFilter"/> из фасет-свойств VM.</summary>
+        private DocumentFilter BuildCurrentFilter()
+        {
+            // RegisteredOnly хранится не в фасет-свойствах, а в пресете
+            // («Журналы регистрации» выражается битом «только
+            // зарегистрированные»). Берём его из RkkPresets.Build(текущий
+            // пресет) — так флаг «живёт» ровно столько, сколько выбран
+            // пресет (и сбрасывается в ResetFilter вместе с CurrentPreset = All).
+            var presetBits = RkkPresets.Build(CurrentPreset);
+
+            return new DocumentFilter
+            {
+                Type = SelectedTypeFacet,
+                Status = SelectedStatusFacet,
+                MyRole = SelectedRoleFacet,
+                Deadline = SelectedDeadlineFacet,
+                NomenclatureCaseId = FilterCase?.Id,
+                SearchText = SearchText,
+                PeriodFrom = AdvancedFromDate,
+                PeriodTo = AdvancedToDate,
+                RegisteredOnly = presetBits.RegisteredOnly,
+            };
+        }
+
+        /// <summary>
+        /// Bug #7. Применяет сохранённый пресет фильтров (задаётся
+        /// MainViewModel-ом при выборе соответствующего пункта в боковом
+        /// меню). Сбрасывает фасет-свойства, проставляет нужные значения
+        /// и перечитывает <see cref="Documents"/>.
+        /// </summary>
+        public void ApplyPreset(RkkPreset preset)
+        {
+            CurrentPreset = preset;
+            var filter = RkkPresets.Build(preset);
+            // Подавляем триггер ApplyFilter() после каждого присваивания —
+            // partial-обработчики OnSelected*Changed дёргают ApplyFilter, а
+            // нам нужно ровно одно перечитывание в конце.
+            _suppressFilterReload = true;
+            try
+            {
+                SelectedTypeFacet = filter.Type;
+                SelectedStatusFacet = filter.Status;
+                SelectedRoleFacet = filter.MyRole;
+                SelectedDeadlineFacet = filter.Deadline;
+                FilterCase = filter.NomenclatureCaseId.HasValue
+                    ? NomenclatureCases.FirstOrDefault(c => c.Id == filter.NomenclatureCaseId.Value)
+                    : null;
+                // Сбрасываем свободные поля поиска при переключении
+                // пресета. Иначе текст/диапазон, оставленные пользователем
+                // в «Поиске», молча сужают выборку «Архивного отдела» /
+                // «Моих задач» / «ИТО» и результат становится непредсказуемым.
+                SearchText = null;
+                AdvancedFromDate = null;
+                AdvancedToDate = null;
+                IsAdvancedSearchOpen = preset == RkkPreset.Search;
+            }
+            finally
+            {
+                _suppressFilterReload = false;
+            }
+            ApplyFilter();
+        }
+
+        private bool _suppressFilterReload;
+
+        /// <summary>Сбросить все фасеточные фильтры и перечитать список.</summary>
+        [RelayCommand]
+        private void ResetFilter()
+        {
+            _suppressFilterReload = true;
+            try
+            {
+                CurrentPreset = RkkPreset.All;
+                SelectedTypeFacet = DocumentTypeFacet.All;
+                SelectedStatusFacet = DocumentStatusFacet.All;
+                SelectedRoleFacet = DocumentRoleFacet.All;
+                SelectedDeadlineFacet = DocumentDeadlineFacet.All;
+                FilterCase = null;
+                SearchText = null;
+                AdvancedFromDate = null;
+                AdvancedToDate = null;
+                IsAdvancedSearchOpen = false;
+            }
+            finally { _suppressFilterReload = false; }
+            ApplyFilter();
+        }
+
+        /// <summary>Открыть/скрыть поп-ап «Расширенный поиск».</summary>
+        [RelayCommand]
+        private void ToggleAdvancedSearch() => IsAdvancedSearchOpen = !IsAdvancedSearchOpen;
 
         /// <summary>
         /// Bug #3 — кнопка «Новый» в РКК. Раньше команда только сбрасывала

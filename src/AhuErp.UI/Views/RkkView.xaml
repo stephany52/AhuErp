@@ -9,15 +9,137 @@
              d:DesignHeight="720" d:DesignWidth="1200">
     <Grid Margin="16">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="320" />
+            <ColumnDefinition Width="360" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
         <DockPanel Grid.Column="0" Margin="0,0,12,0">
-            <TextBlock DockPanel.Dock="Top"
-                       Text="Регистрационно-контрольная карточка"
-                       FontSize="16" FontWeight="SemiBold"
-                       Margin="0,0,0,8" TextWrapping="Wrap" />
+            <!-- Bug #7. Шапка РКК: заголовок + пресет + полнотекстовый поиск
+                 + кнопка «Расширенный поиск». Текст пресета меняется при выборе
+                 соответствующего пункта в боковой навигации MainView. -->
+            <StackPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                <TextBlock Text="Регистрационно-контрольная карточка"
+                           FontSize="16" FontWeight="SemiBold"
+                           TextWrapping="Wrap" />
+                <TextBlock Text="{Binding PresetDisplay}"
+                           Foreground="#2563EB" FontSize="11" FontWeight="SemiBold"
+                           Margin="0,2,0,6" />
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                             ToolTip="Полнотекстовый поиск по теме, корреспонденту и регистрационному номеру"
+                             Padding="6" />
+                    <Button Grid.Column="1" Content="Найти"
+                            Command="{Binding ApplyFilterCommand}"
+                            Padding="8,3" Margin="6,0,0,0" />
+                </Grid>
+                <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                    <Button Content="Расширенный поиск"
+                            Command="{Binding ToggleAdvancedSearchCommand}"
+                            Padding="6,3" Margin="0,0,6,0" />
+                    <Button Content="Сбросить фильтры"
+                            Command="{Binding ResetFilterCommand}"
+                            Padding="6,3" />
+                </StackPanel>
+            </StackPanel>
+
+            <!-- Bug #7. Поп-ап «Расширенный поиск» — те же поля, что и SearchView
+                 (период «с/по»). Видимость управляется IsAdvancedSearchOpen. -->
+            <Border DockPanel.Dock="Top"
+                    Background="#F8FAFC" BorderBrush="#CBD5E1" BorderThickness="1"
+                    CornerRadius="4" Padding="8" Margin="0,0,0,8"
+                    Visibility="{Binding IsAdvancedSearchOpen, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <StackPanel>
+                    <TextBlock Text="Расширенный поиск" FontWeight="SemiBold" Margin="0,0,0,6" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="60" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Text="Период с:" Margin="0,4" />
+                        <DatePicker Grid.Column="1"
+                                    SelectedDate="{Binding AdvancedFromDate}"
+                                    Margin="6,2" />
+                        <TextBlock Grid.Row="1" Text="По:" Margin="0,4" />
+                        <DatePicker Grid.Row="1" Grid.Column="1"
+                                    SelectedDate="{Binding AdvancedToDate}"
+                                    Margin="6,2" />
+                    </Grid>
+                    <Button Content="Применить расширенный поиск"
+                            Command="{Binding ApplyFilterCommand}"
+                            HorizontalAlignment="Left" Padding="8,4" Margin="0,6,0,0" />
+                </StackPanel>
+            </Border>
+
+            <!-- Bug #7. Фасеточные фильтры: Тип / Статус / Моя роль / Срок / Дело. -->
+            <Expander DockPanel.Dock="Top" Header="Фильтры" IsExpanded="True"
+                      Margin="0,0,0,8">
+                <Grid Margin="0,6,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="100" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Text="Тип:" Margin="0,4" VerticalAlignment="Center" />
+                    <ComboBox Grid.Column="1"
+                              ItemsSource="{Binding TypeFacets}"
+                              SelectedItem="{Binding SelectedTypeFacet}"
+                              ItemTemplate="{StaticResource EnumComboBoxItemTemplate}"
+                              Margin="6,2" Padding="6" />
+
+                    <TextBlock Grid.Row="1" Text="Статус:" Margin="0,4" VerticalAlignment="Center" />
+                    <ComboBox Grid.Row="1" Grid.Column="1"
+                              ItemsSource="{Binding StatusFacets}"
+                              SelectedItem="{Binding SelectedStatusFacet}"
+                              ItemTemplate="{StaticResource EnumComboBoxItemTemplate}"
+                              Margin="6,2" Padding="6" />
+
+                    <TextBlock Grid.Row="2" Text="Моя роль:" Margin="0,4" VerticalAlignment="Center" />
+                    <ComboBox Grid.Row="2" Grid.Column="1"
+                              ItemsSource="{Binding RoleFacets}"
+                              SelectedItem="{Binding SelectedRoleFacet}"
+                              ItemTemplate="{StaticResource EnumComboBoxItemTemplate}"
+                              Margin="6,2" Padding="6" />
+
+                    <TextBlock Grid.Row="3" Text="Срок:" Margin="0,4" VerticalAlignment="Center" />
+                    <ComboBox Grid.Row="3" Grid.Column="1"
+                              ItemsSource="{Binding DeadlineFacets}"
+                              SelectedItem="{Binding SelectedDeadlineFacet}"
+                              ItemTemplate="{StaticResource EnumComboBoxItemTemplate}"
+                              Margin="6,2" Padding="6" />
+
+                    <TextBlock Grid.Row="4" Text="Дело:" Margin="0,4" VerticalAlignment="Center" />
+                    <ComboBox Grid.Row="4" Grid.Column="1"
+                              ItemsSource="{Binding NomenclatureCases}"
+                              SelectedItem="{Binding FilterCase}"
+                              Margin="6,2" Padding="6">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock>
+                                    <Run Text="{Binding Index}" FontWeight="SemiBold" />
+                                    <Run Text=" — " />
+                                    <Run Text="{Binding Title}" />
+                                </TextBlock>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                </Grid>
+            </Expander>
+
             <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
                 <Button Content="Новый" Command="{Binding NewCommand}" MinWidth="70" Padding="6,3" Margin="0,0,6,0" />
                 <Button Content="Обновить" Command="{Binding ReloadCommand}" MinWidth="80" Padding="6,3" />
