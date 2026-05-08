@@ -147,6 +147,7 @@ namespace AhuErp.UI.Converters
             [AuditActionType.SignatureAdded] = "Подписание",
             [AuditActionType.SignatureRevoked] = "Отзыв подписи",
             [AuditActionType.DocumentLocked] = "Документ заблокирован КЭП",
+            [AuditActionType.DocumentUnlocked] = "Документ разблокирован",
             [AuditActionType.NotificationSent] = "Уведомление отправлено",
             [AuditActionType.SubstitutionCreated] = "Замещение создано",
             [AuditActionType.SubstitutionCancelled] = "Замещение отменено",

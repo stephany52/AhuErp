@@ -569,6 +569,7 @@ namespace AhuErp.Core.Services
                 case AuditActionType.SignatureAdded: return "Подписание";
                 case AuditActionType.SignatureRevoked: return "Отзыв подписи";
                 case AuditActionType.DocumentLocked: return "Блокировка КЭП";
+                case AuditActionType.DocumentUnlocked: return "Разблокировка";
                 case AuditActionType.NotificationSent: return "Уведомление";
                 case AuditActionType.SubstitutionCreated: return "Замещение создано";
                 case AuditActionType.SubstitutionCancelled: return "Замещение отменено";
