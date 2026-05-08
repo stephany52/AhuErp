@@ -137,21 +137,49 @@ namespace AhuErp.UI.ViewModels
         [RelayCommand]
         private void Refresh() => Reload();
 
+        // Bug #5 (review). Подавляет лишние Reload() при батчевом сбросе/
+        // установке фильтров: каждое присваивание FilterXxx триггерит
+        // OnFilterXxxChanged → Reload(), и без флага ClearFilters() гонял
+        // EF6 c .Include() 3 джойнами 5 раз подряд (4 промежуточных + 1
+        // финальный). Тоже бы пригодилось для будущих программных
+        // batch-апдейтов фильтров.
+        private bool _suppressFilterReload;
+
         // Bug #5. Сброс всех фильтров журнала движений за один клик.
         [RelayCommand]
         private void ClearFilters()
         {
-            FilterFrom = null;
-            FilterTo = null;
-            FilterCategory = null;
-            FilterInitiator = null;
+            _suppressFilterReload = true;
+            try
+            {
+                FilterFrom = null;
+                FilterTo = null;
+                FilterCategory = null;
+                FilterInitiator = null;
+            }
+            finally
+            {
+                _suppressFilterReload = false;
+            }
             Reload();
         }
 
-        partial void OnFilterFromChanged(DateTime? value) => Reload();
-        partial void OnFilterToChanged(DateTime? value) => Reload();
-        partial void OnFilterCategoryChanged(InventoryCategory? value) => Reload();
-        partial void OnFilterInitiatorChanged(Employee value) => Reload();
+        partial void OnFilterFromChanged(DateTime? value)
+        {
+            if (!_suppressFilterReload) Reload();
+        }
+        partial void OnFilterToChanged(DateTime? value)
+        {
+            if (!_suppressFilterReload) Reload();
+        }
+        partial void OnFilterCategoryChanged(InventoryCategory? value)
+        {
+            if (!_suppressFilterReload) Reload();
+        }
+        partial void OnFilterInitiatorChanged(Employee value)
+        {
+            if (!_suppressFilterReload) Reload();
+        }
 
         [RelayCommand(CanExecute = nameof(CanAddItem))]
         private void AddItem()
