@@ -47,6 +47,9 @@ namespace AhuErp.UI.ViewModels
         public ObservableCollection<DocumentTask> Tasks { get; }
             = new ObservableCollection<DocumentTask>();
 
+        public ObservableCollection<DocumentResolution> Resolutions { get; }
+            = new ObservableCollection<DocumentResolution>();
+
         public ObservableCollection<DocumentApproval> Approvals { get; }
             = new ObservableCollection<DocumentApproval>();
 
@@ -159,6 +162,7 @@ namespace AhuErp.UI.ViewModels
         [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
         [NotifyCanExecuteChangedFor(nameof(RegisterCommand))]
         [NotifyCanExecuteChangedFor(nameof(AddTaskCommand))]
+        [NotifyCanExecuteChangedFor(nameof(AddResolutionCommand))]
         [NotifyCanExecuteChangedFor(nameof(CreateInventoryWriteOffCommand))]
         [NotifyCanExecuteChangedFor(nameof(CreateVehicleTripCommand))]
         [NotifyCanExecuteChangedFor(nameof(CreateArchiveRequestCommand))]
@@ -225,6 +229,13 @@ namespace AhuErp.UI.ViewModels
         [NotifyCanExecuteChangedFor(nameof(AddTaskCommand))]
         private string newTaskDescription;
 
+        // Bug #4 — отдельное поле под текст резолюции (см. вкладку
+        // «3. Поручения и контроль» — секция «Резолюции руководителя»).
+        // Кнопка «Наложить резолюцию» доступна только Manager/Admin.
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(AddResolutionCommand))]
+        private string newResolutionText;
+
         [ObservableProperty]
         private DateTime newTaskDeadline = DateTime.Today.AddDays(3);
 
@@ -286,6 +297,7 @@ namespace AhuErp.UI.ViewModels
             SelectedCase = NomenclatureCases.FirstOrDefault(c => c.Id == value.NomenclatureCaseId);
             ReloadAttachments();
             ReloadTasks();
+            ReloadResolutions();
             ReloadApprovals();
             ReloadHistory();
             ReloadRelatedOps();
@@ -441,6 +453,37 @@ namespace AhuErp.UI.ViewModels
                 SelectedDocument = Documents.FirstOrDefault(d => d.Id == docId);
             }
             catch (Exception ex) { ErrorMessage = ex.Message; }
+        }
+
+        // Bug #4. «Наложить резолюцию» — отдельная команда для руководителя.
+        // Не требует исполнителя/срока в UI: исполнитель упоминается в тексте
+        // самой резолюции по формату «@ФамилияИО», и сервис создаст ему
+        // in-app/e-mail уведомление. Конкретные поручения с дедлайнами
+        // создаются отдельно командой AddTask.
+        [RelayCommand(CanExecute = nameof(CanIssueResolution))]
+        private void AddResolution()
+        {
+            ErrorMessage = null;
+            try
+            {
+                var actor = _auth.CurrentEmployee?.Id ?? 0;
+                if (actor == 0) { ErrorMessage = "Не определён текущий сотрудник."; return; }
+
+                _tasksService.AddResolution(SelectedDocument.Id, actor, NewResolutionText);
+                NewResolutionText = null;
+                ReloadResolutions();
+                ReloadHistory();
+            }
+            catch (Exception ex) { ErrorMessage = ex.Message; }
+        }
+
+        private bool CanIssueResolution()
+        {
+            var role = _auth?.CurrentEmployee?.Role;
+            return SelectedDocument != null
+                   && !string.IsNullOrWhiteSpace(NewResolutionText)
+                   && role.HasValue
+                   && RolePolicy.CanIssueResolution(role.Value);
         }
 
         [RelayCommand(CanExecute = nameof(CanAddTask))]
@@ -641,6 +684,14 @@ namespace AhuErp.UI.ViewModels
             foreach (var t in _tasksService.ListByDocument(SelectedDocument.Id)) Tasks.Add(t);
         }
 
+        private void ReloadResolutions()
+        {
+            Resolutions.Clear();
+            if (SelectedDocument == null) return;
+            foreach (var r in _tasksService.ListResolutionsByDocument(SelectedDocument.Id))
+                Resolutions.Add(r);
+        }
+
         private void ReloadApprovals()
         {
             Approvals.Clear();
@@ -673,6 +724,7 @@ namespace AhuErp.UI.ViewModels
             SelectedCase = null;
             Attachments.Clear();
             Tasks.Clear();
+            Resolutions.Clear();
             Approvals.Clear();
             History.Clear();
             Signatures.Clear();

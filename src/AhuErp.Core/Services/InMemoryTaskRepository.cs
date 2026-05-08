@@ -28,6 +28,12 @@ namespace AhuErp.Core.Services
                            .ToList()
                            .AsReadOnly();
 
+        public IReadOnlyList<DocumentResolution> ListResolutionsByDocument(int documentId)
+            => _resolutions.Where(r => r.DocumentId == documentId)
+                           .OrderByDescending(r => r.IssuedAt)
+                           .ToList()
+                           .AsReadOnly();
+
         public DocumentTask AddTask(DocumentTask task)
         {
             if (task.Id == 0) task.Id = _nextTaskId++;
