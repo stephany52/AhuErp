@@ -70,16 +70,36 @@ namespace AhuErp.Tests
         [Theory]
         [InlineData(DocumentStatusFacet.Draft, DocumentStatus.New)]
         [InlineData(DocumentStatusFacet.Registered, DocumentStatus.Registered)]
-        [InlineData(DocumentStatusFacet.OnApproval, DocumentStatus.InProgress)]
-        [InlineData(DocumentStatusFacet.Approved, DocumentStatus.InProgress)]
-        [InlineData(DocumentStatusFacet.OnExecution, DocumentStatus.InProgress)]
+        [InlineData(DocumentStatusFacet.OnApproval, DocumentStatus.OnApproval)]
+        [InlineData(DocumentStatusFacet.Approved, DocumentStatus.Approved)]
+        [InlineData(DocumentStatusFacet.Rejected, DocumentStatus.Rejected)]
+        [InlineData(DocumentStatusFacet.OnSigning, DocumentStatus.OnSigning)]
+        [InlineData(DocumentStatusFacet.Signed, DocumentStatus.Signed)]
         [InlineData(DocumentStatusFacet.Completed, DocumentStatus.Completed)]
         [InlineData(DocumentStatusFacet.Cancelled, DocumentStatus.Cancelled)]
+        [InlineData(DocumentStatusFacet.Archived, DocumentStatus.Archived)]
         public void ToSearchFilter_Status_maps_to_DocumentStatus(DocumentStatusFacet facet, DocumentStatus expected)
         {
+            // Phase 13: фасетный статус соответствует одному из 11 значений
+            // DocumentStatus один-к-одному (legacy-маппинг через InProgress
+            // заменён на точные подстатусы делопроизводства).
             var f = new DocumentFilter { Status = facet };
             var s = f.ToSearchFilter(null);
             Assert.Equal(expected, s.Status);
+        }
+
+        [Fact]
+        public void ToSearchFilter_OnExecution_facet_includes_legacy_InProgress()
+        {
+            // Phase 13: фасет «На исполнении» агрегирует и точный статус
+            // OnExecution (новые документы), и legacy InProgress (документы
+            // до Phase 13).
+            var f = new DocumentFilter { Status = DocumentStatusFacet.OnExecution };
+            var s = f.ToSearchFilter(null);
+            Assert.Null(s.Status);
+            Assert.NotNull(s.StatusIn);
+            Assert.Contains(DocumentStatus.OnExecution, s.StatusIn);
+            Assert.Contains(DocumentStatus.InProgress, s.StatusIn);
         }
 
         [Fact]

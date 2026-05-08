@@ -98,18 +98,40 @@ namespace AhuErp.Core.Services
                     f.Status = DocumentStatus.Registered;
                     break;
                 case DocumentStatusFacet.OnApproval:
+                    // Phase 13: точный статус. До этого фасет «На согласовании»
+                    // отображался через InProgress, теперь — через выделенный
+                    // DocumentStatus.OnApproval.
+                    f.Status = DocumentStatus.OnApproval;
+                    break;
                 case DocumentStatusFacet.Approved:
+                    f.Status = DocumentStatus.Approved;
+                    break;
+                case DocumentStatusFacet.Rejected:
+                    f.Status = DocumentStatus.Rejected;
+                    break;
+                case DocumentStatusFacet.OnSigning:
+                    f.Status = DocumentStatus.OnSigning;
+                    break;
+                case DocumentStatusFacet.Signed:
+                    f.Status = DocumentStatus.Signed;
+                    break;
                 case DocumentStatusFacet.OnExecution:
-                    // Текущая модель DocumentStatus не различает эти
-                    // подсостояния; подгружаем «InProgress» как близкий
-                    // эквивалент. Точное разделение войдёт в Improvement #11.
-                    f.Status = DocumentStatus.InProgress;
+                    // Включаем legacy InProgress как эквивалент OnExecution —
+                    // данные, созданные до Phase 13, остаются видимыми.
+                    f.StatusIn = new[]
+                    {
+                        DocumentStatus.OnExecution,
+                        DocumentStatus.InProgress,
+                    };
                     break;
                 case DocumentStatusFacet.Completed:
                     f.Status = DocumentStatus.Completed;
                     break;
                 case DocumentStatusFacet.Cancelled:
                     f.Status = DocumentStatus.Cancelled;
+                    break;
+                case DocumentStatusFacet.Archived:
+                    f.Status = DocumentStatus.Archived;
                     break;
                 case DocumentStatusFacet.Overdue:
                     f.OverdueOnly = true;
@@ -121,6 +143,12 @@ namespace AhuErp.Core.Services
                         DocumentStatus.InProgress,
                         DocumentStatus.OnHold,
                         DocumentStatus.Registered,
+                        DocumentStatus.OnApproval,
+                        DocumentStatus.Approved,
+                        DocumentStatus.Rejected,
+                        DocumentStatus.OnSigning,
+                        DocumentStatus.Signed,
+                        DocumentStatus.OnExecution,
                     };
                     break;
                 case DocumentStatusFacet.All:
@@ -291,9 +319,13 @@ namespace AhuErp.Core.Services
         Registered,
         OnApproval,
         Approved,
+        Rejected,
+        OnSigning,
+        Signed,
         OnExecution,
         Completed,
         Cancelled,
+        Archived,
         Overdue,
         NotCompleted,
     }

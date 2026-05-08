@@ -123,6 +123,14 @@ namespace AhuErp.Core.Services
             {
                 doc.IsLocked = true;
                 if (att != null) doc.CurrentVersionAttachmentId = att.Id;
+                // Phase 13: Quailfied-подпись продвигает основной DocumentStatus
+                // в Signed, если документ был на подписании. TryTransition «тихо»
+                // пропускает остальные исходные статусы — это позволяет
+                // задним числом подписать черновик без падения.
+                DocumentStateMachine.TryTransition(
+                    doc, DocumentStatus.Signed,
+                    actorRole: null, actorId: signerId, _audit,
+                    reason: $"Подписан КЭП (подпись #{sig.Id})");
                 _documents.Update(doc);
                 _audit.Record(AuditActionType.DocumentLocked, nameof(Document), doc.Id, signerId,
                     newValues: "IsLocked=true", details: "Подписан КЭП");
