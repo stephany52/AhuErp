@@ -62,12 +62,39 @@ namespace AhuErp.UI.Infrastructure
                 Role = EmployeeRole.WarehouseManager,
                 PasswordHash = hash
             };
+            var clerk = new Employee
+            {
+                Id = 6,
+                FullName = "Иванова Светлана Петровна",
+                Position = "Делопроизводитель отдела делопроизводства",
+                Role = EmployeeRole.Clerk,
+                PasswordHash = hash
+            };
+            var hr = new Employee
+            {
+                Id = 7,
+                FullName = "Петрова Анна Викторовна",
+                Position = "Специалист отдела учёта/отчётности/кадрового обеспечения",
+                Role = EmployeeRole.HRAdmin,
+                PasswordHash = hash
+            };
+            var deputy = new Employee
+            {
+                Id = 8,
+                FullName = "Кузнецов Игорь Александрович",
+                Position = "Заместитель руководителя",
+                Role = EmployeeRole.DeputyHead,
+                PasswordHash = hash
+            };
 
             employees.Add(admin);
             employees.Add(manager);
             employees.Add(archivist);
             employees.Add(tech);
             employees.Add(warehouse);
+            employees.Add(clerk);
+            employees.Add(hr);
+            employees.Add(deputy);
 
             var now = DateTime.Now;
 

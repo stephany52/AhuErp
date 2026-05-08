@@ -114,5 +114,79 @@ namespace AhuErp.Tests
             // Один этап на Comments + второй ещё в Pending → маршрут не завершён.
             Assert.Equal(ApprovalRouteStatus.InProgress, _docs.GetById(_doc.Id).ApprovalStatus);
         }
+
+        // ============================================================
+        // Bug #6 — авторизация ApplyDecision строго по Stage.ApproverId,
+        // никаких проверок по EmployeeRole. Сотрудник с любой ролью
+        // (включая TechSupport) обязан мочь согласовать «свой» этап.
+        // ============================================================
+
+        [Fact]
+        public void ApplyDecision_allows_owner_independent_of_role()
+        {
+            // Этап выписан на сотрудника #10 (роль не задана). Сервис не
+            // должен запрашивать роль вообще — достаточно совпадения Id.
+            var approvals = _service.StartApproval(_doc.Id, _template.Id, actorId: 1);
+            var first = approvals[0];
+
+            var result = _service.ApplyDecision(first.Id, ApprovalDecision.Approved, actorId: 10);
+
+            Assert.Equal(ApprovalDecision.Approved, result.Decision);
+        }
+
+        [Fact]
+        public void ApplyDecision_throws_for_unrelated_actor()
+        {
+            // Сотрудник #999 не согласующий и не имеет замещения.
+            var approvals = _service.StartApproval(_doc.Id, _template.Id, actorId: 1);
+
+            var ex = Assert.Throws<UnauthorizedAccessException>(() =>
+                _service.ApplyDecision(approvals[0].Id, ApprovalDecision.Approved, actorId: 999));
+            Assert.Contains("не является согласующим", ex.Message);
+        }
+
+        [Fact]
+        public void ApplyDecision_allows_active_substitute_via_substitution_service()
+        {
+            // Сценарий: согласующий #10 уехал, на ApprovalsOnly активна
+            // подмена на #50. На момент StartApproval substitution-сервис
+            // уже резолвнул этап на #50 — это и есть «авторизация по факту».
+            var subs = new InMemorySubstitutionRepository();
+            var subAudit = new AuditService(new InMemoryAuditLogRepository());
+            var subSvc = new SubstitutionService(subs, subAudit);
+            subSvc.Create(originalId: 10, substituteId: 50,
+                from: DateTime.Now.AddDays(-1), to: DateTime.Now.AddDays(1),
+                scope: SubstitutionScope.ApprovalsOnly, reason: "отпуск", actorId: 1);
+
+            var service = new ApprovalService(
+                _approvalRepo, _docs, _audit,
+                workflow: null, signatures: null,
+                substitution: subSvc, notifications: null);
+
+            var approvals = service.StartApproval(_doc.Id, _template.Id, actorId: 1);
+            // Этап #1 был выписан на #10, но фактический владелец после
+            // резолва замещения — #50. Подменяемый исходный сотрудник
+            // (#10) уже не должен мочь применить решение.
+            Assert.Equal(50, approvals[0].ApproverId);
+
+            var result = service.ApplyDecision(approvals[0].Id, ApprovalDecision.Approved, actorId: 50);
+            Assert.Equal(ApprovalDecision.Approved, result.Decision);
+        }
+
+        [Fact]
+        public void ApplyDecision_does_not_check_employee_role()
+        {
+            // Регрессионный тест Bug #6: сотрудник с ролью TechSupport,
+            // если он назначен согласующим этапа, должен иметь право
+            // согласования. Никакой проверки EmployeeRole внутри
+            // ApprovalService быть не должно.
+            var approvals = _service.StartApproval(_doc.Id, _template.Id, actorId: 1);
+            var first = approvals[0]; // ApproverId == 10
+
+            // Любая роль, лишь бы Id совпадал — должно сработать.
+            var result = _service.ApplyDecision(first.Id, ApprovalDecision.Approved, actorId: 10);
+
+            Assert.Equal(ApprovalDecision.Approved, result.Decision);
+        }
     }
 }
