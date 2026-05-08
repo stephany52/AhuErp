@@ -199,7 +199,18 @@ namespace AhuErp.Core.Services
                     q = q.Where(d => d.VehicleTrips != null && d.VehicleTrips.Count > 0);
                     break;
                 case DocumentTypeFacet.WriteOffs:
-                    q = q.Where(d => d.Type == DocumentType.Internal);
+                    // Старое поведение брало все Internal-документы, что
+                    // включало служебные записки, распоряжения и пр. Акты
+                    // списания ТМЦ имеют ShortCode = «АКТ» (см. EfDataSeeder)
+                    // и Name «Акт списания ТМЦ» — фильтруем по ShortCode/Name,
+                    // как это сделано для Contracts/ServiceMemos.
+                    q = q.Where(d => d.DocumentTypeRef != null
+                                     && ((d.DocumentTypeRef.ShortCode != null
+                                          && (d.DocumentTypeRef.ShortCode.IndexOf("АКТ", StringComparison.OrdinalIgnoreCase) >= 0
+                                              || d.DocumentTypeRef.ShortCode.IndexOf("писан", StringComparison.OrdinalIgnoreCase) >= 0
+                                              || d.DocumentTypeRef.ShortCode.IndexOf("writeoff", StringComparison.OrdinalIgnoreCase) >= 0))
+                                         || (d.DocumentTypeRef.Name != null
+                                             && d.DocumentTypeRef.Name.IndexOf("писан", StringComparison.OrdinalIgnoreCase) >= 0)));
                     break;
             }
 

@@ -361,6 +361,64 @@ namespace AhuErp.Tests
         }
 
         [Fact]
+        public void PostFilter_WriteOffs_keeps_only_writeoff_acts_drops_other_internals()
+        {
+            // Регрессия: раньше WriteOffs матчил любой DocumentType.Internal,
+            // что включало служебные записки и распоряжения. Теперь фильтр
+            // привязан к ShortCode/Name «АКТ» / «списан» (паритет с
+            // DocumentTypeRef «Акт списания ТМЦ» из EfDataSeeder).
+            var actType = new DocumentTypeRef
+            {
+                Id = 1,
+                Name = "Акт списания ТМЦ",
+                ShortCode = "АКТ",
+                DefaultDirection = DocumentDirection.Internal,
+                IsActive = true,
+            };
+            var memoType = new DocumentTypeRef
+            {
+                Id = 2,
+                Name = "Служебная записка",
+                ShortCode = "СЛУЖ",
+                DefaultDirection = DocumentDirection.Internal,
+                IsActive = true,
+            };
+
+            var writeOff = new Document
+            {
+                Id = 1,
+                Title = "Акт списания ноутбука",
+                Type = DocumentType.Internal,
+                Direction = DocumentDirection.Internal,
+                DocumentTypeRef = actType,
+            };
+            var memo = new Document
+            {
+                Id = 2,
+                Title = "Служебная записка",
+                Type = DocumentType.Internal,
+                Direction = DocumentDirection.Internal,
+                DocumentTypeRef = memoType,
+            };
+            var memoWithoutRef = new Document
+            {
+                Id = 3,
+                Title = "Распоряжение",
+                Type = DocumentType.Internal,
+                Direction = DocumentDirection.Internal,
+            };
+
+            var f = new DocumentFilter { Type = DocumentTypeFacet.WriteOffs };
+            var result = f.ApplyClientSidePostFilters(
+                new[] { writeOff, memo, memoWithoutRef },
+                currentEmployeeId: null,
+                now: DateTime.Now);
+
+            Assert.Single(result);
+            Assert.Equal(writeOff.Id, result[0].Id);
+        }
+
+        [Fact]
         public void Preset_MyTasks_is_executor_plus_not_completed()
         {
             var f = RkkPresets.Build(RkkPreset.MyTasks);
