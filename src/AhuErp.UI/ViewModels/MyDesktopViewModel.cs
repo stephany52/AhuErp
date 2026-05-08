@@ -4,8 +4,10 @@ using System.Linq;
 using AhuErp.Core.Models;
 using AhuErp.Core.Services;
 using AhuErp.UI.Infrastructure;
+using AhuErp.UI.Messaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.Mvvm.Messaging;
 
 namespace AhuErp.UI.ViewModels
 {
@@ -22,6 +24,7 @@ namespace AhuErp.UI.ViewModels
         private readonly INotificationService _notifications;
         private readonly ISubstitutionService _substitutions;
         private readonly IDocumentNavigator _navigator;
+        private readonly IMessenger _messenger;
 
         public ObservableCollection<DocumentTask> Tasks { get; } = new ObservableCollection<DocumentTask>();
         public ObservableCollection<DocumentApproval> Approvals { get; } = new ObservableCollection<DocumentApproval>();
@@ -51,13 +54,23 @@ namespace AhuErp.UI.ViewModels
         [ObservableProperty]
         private string disciplineSummary;
 
+        /// <summary>
+        /// Bug #2 — фильтр ленты уведомлений. По умолчанию показываются только
+        /// непрочитанные, чтобы карточка после нажатия «Прочитано» сразу
+        /// исчезала из списка. Чекбокс «Показывать только непрочитанные» в
+        /// заголовке колонки переключает состояние.
+        /// </summary>
+        [ObservableProperty]
+        private bool showOnlyUnread = true;
+
         public MyDesktopViewModel(
             IAuthService auth,
             ITaskService taskService,
             IApprovalService approvalService,
             INotificationService notifications,
             ISubstitutionService substitutions,
-            IDocumentNavigator navigator = null)
+            IDocumentNavigator navigator = null,
+            IMessenger messenger = null)
         {
             _auth = auth ?? throw new ArgumentNullException(nameof(auth));
             _taskService = taskService ?? throw new ArgumentNullException(nameof(taskService));
@@ -65,9 +78,12 @@ namespace AhuErp.UI.ViewModels
             _notifications = notifications ?? throw new ArgumentNullException(nameof(notifications));
             _substitutions = substitutions ?? throw new ArgumentNullException(nameof(substitutions));
             _navigator = navigator;
+            _messenger = messenger ?? WeakReferenceMessenger.Default;
 
             Reload();
         }
+
+        partial void OnShowOnlyUnreadChanged(bool value) => ReloadNotifications();
 
         /// <summary>
         /// Открыть РКК документа, к которому привязана выбранная карточка
@@ -128,17 +144,29 @@ namespace AhuErp.UI.ViewModels
             foreach (var row in report.ByExecutor ?? Array.Empty<EmployeeDisciplineRow>())
                 DisciplineRows.Add(row);
 
-            Notifications.Clear();
-            foreach (var n in _notifications.ListForUser(me.Id, unreadOnly: false).Take(50))
-            {
-                Notifications.Add(n);
-            }
-            UnreadCount = _notifications.CountUnread(me.Id);
+            ReloadNotifications();
 
             var sub = _substitutions.GetActiveSubstitute(me.Id, DateTime.Now, SubstitutionScope.Full);
             SubstitutionBanner = sub != null
                 ? $"Активно замещение до {sub.To:dd.MM.yyyy}: исполняет {sub.SubstituteEmployee?.FullName ?? "(заместитель)"}."
                 : null;
+        }
+
+        private void ReloadNotifications()
+        {
+            var me = _auth.CurrentEmployee;
+            Notifications.Clear();
+            if (me == null)
+            {
+                UnreadCount = 0;
+                return;
+            }
+
+            foreach (var n in _notifications.ListForUser(me.Id, unreadOnly: ShowOnlyUnread).Take(50))
+            {
+                Notifications.Add(n);
+            }
+            UnreadCount = _notifications.CountUnread(me.Id);
         }
 
         private void ReloadApprovals()
@@ -161,15 +189,56 @@ namespace AhuErp.UI.ViewModels
             var me = _auth.CurrentEmployee;
             if (me == null) return;
             _notifications.MarkAllRead(me.Id);
-            Reload();
+
+            var now = DateTime.Now;
+            if (ShowOnlyUnread)
+            {
+                Notifications.Clear();
+            }
+            else
+            {
+                // Notification — POCO без INotifyPropertyChanged: in-place
+                // мутация ReadAt не поднимет DataTrigger по IsRead. Чтобы
+                // карточки сразу затухли до Opacity 0.5, делаем Replace в
+                // ObservableCollection — ItemsControl пересоздаст контейнеры
+                // и DataTriggers перевычислятся по уже изменённому IsRead.
+                for (int i = 0; i < Notifications.Count; i++)
+                {
+                    var item = Notifications[i];
+                    if (!item.ReadAt.HasValue) item.ReadAt = now;
+                    Notifications[i] = item;
+                }
+            }
+            UnreadCount = _notifications.CountUnread(me.Id);
+            _messenger.Send(new UnreadCountChangedMessage(UnreadCount));
         }
 
         [RelayCommand]
         public void MarkRead(Notification n)
         {
-            if (n == null || _auth.CurrentEmployee == null) return;
-            _notifications.MarkRead(n.Id, _auth.CurrentEmployee.Id);
-            Reload();
+            var me = _auth.CurrentEmployee;
+            if (n == null || me == null) return;
+            _notifications.MarkRead(n.Id, me.Id);
+
+            // Локальное состояние держим консистентным с сервисом.
+            if (!n.ReadAt.HasValue) n.ReadAt = DateTime.Now;
+
+            if (ShowOnlyUnread)
+            {
+                Notifications.Remove(n);
+            }
+            else
+            {
+                // POCO Notification без INotifyPropertyChanged — DataTrigger
+                // по IsRead в DataTemplate не сработает на in-place мутации.
+                // Replace по индексу провоцирует ItemsControl переcоздать
+                // контейнер карточки с новой подсветкой.
+                var idx = Notifications.IndexOf(n);
+                if (idx >= 0) Notifications[idx] = n;
+            }
+
+            UnreadCount = _notifications.CountUnread(me.Id);
+            _messenger.Send(new UnreadCountChangedMessage(UnreadCount));
         }
     }
 }

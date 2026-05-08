@@ -11,6 +11,7 @@
             <conv:EnumDisplayConverter         x:Key="EnumDisplayConverter" />
             <conv:AuditValuesConverter         x:Key="AuditValuesConverter" />
             <conv:BooleanDisplayConverter      x:Key="BooleanDisplayConverter" />
+            <conv:InventoryDeltaSignConverter  x:Key="InventoryDeltaSignConverter" />
 
             <!-- Шаблон элемента ComboBox, отображающий enum через локализующий конвертер.
                  Используется через ItemTemplate="{StaticResource EnumComboBoxItemTemplate}"

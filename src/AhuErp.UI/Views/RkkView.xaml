@@ -81,7 +81,7 @@
                                     <TextBlock Text="{Binding RegistrationNumberDisplay}"
                                                FontWeight="SemiBold" VerticalAlignment="Center" />
                                     <Border Background="#FCD34D" Padding="6,1" CornerRadius="3" Margin="12,0,0,0"
-                                            Visibility="{Binding SelectedDocument.IsLocked, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                            Visibility="{Binding IsDocumentLocked, Converter={StaticResource BooleanToVisibilityConverter}}"
                                             ToolTip="Документ закрыт квалифицированной подписью и доступен только для чтения">
                                         <TextBlock Text="🔒 Документ заблокирован КЭП" FontWeight="SemiBold" Foreground="#78350F" />
                                     </Border>
@@ -193,75 +193,137 @@
                     </TabItem>
 
                     <TabItem Header="3. Поручения и контроль">
-                        <DockPanel Margin="12">
-                            <Border DockPanel.Dock="Top" Background="#F9FAFB" CornerRadius="4" Padding="8" Margin="0,0,0,8">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="220" />
-                                        <ColumnDefinition Width="120" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBox Text="{Binding NewTaskDescription, UpdateSourceTrigger=PropertyChanged}"
-                                             Margin="0,0,6,0" Padding="6"
-                                             VerticalAlignment="Center"
-                                             ToolTip="Описание поручения" />
-                                    <ComboBox Grid.Column="1"
-                                              ItemsSource="{Binding Employees}"
-                                              SelectedItem="{Binding NewTaskExecutor}"
-                                              DisplayMemberPath="FullName"
-                                              IsEditable="True"
-                                              IsTextSearchEnabled="True"
-                                              StaysOpenOnEdit="True"
-                                              TextSearch.TextPath="FullName"
-                                              ToolTip="Исполнитель — начните вводить ФИО"
-                                              Margin="0,0,6,0" Padding="6"
-                                              VerticalAlignment="Center" />
-                                    <DatePicker Grid.Column="2"
-                                                SelectedDate="{Binding NewTaskDeadline}"
-                                                Margin="0,0,6,0" />
-                                    <Button Grid.Column="3"
-                                            Content="Создать поручение"
-                                            Command="{Binding AddTaskCommand}"
-                                            Padding="8,4" />
-                                </Grid>
+                        <Grid Margin="12">
+                            <Grid.RowDefinitions>
+                                <!-- Bug #4: верхняя секция «Резолюции руководителя»
+                                     отделена от секции «Поручения по документу».
+                                     Резолюция — текстовое указание автора (с упоминанием
+                                     исполнителя «@ФамилияИО»); поручение — формализованная
+                                     задача с дедлайном. -->
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" MinHeight="120" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" MinHeight="160" />
+                            </Grid.RowDefinitions>
+
+                            <!-- Резолюции руководителя -->
+                            <Border Grid.Row="0" Background="#F9FAFB" CornerRadius="4" Padding="8" Margin="0,0,0,8">
+                                <DockPanel>
+                                    <TextBlock DockPanel.Dock="Top"
+                                               Text="Резолюции руководителя"
+                                               FontWeight="SemiBold"
+                                               Margin="0,0,0,6" />
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox Text="{Binding NewResolutionText, UpdateSourceTrigger=PropertyChanged}"
+                                                 Margin="0,0,6,0" Padding="6"
+                                                 AcceptsReturn="True"
+                                                 TextWrapping="Wrap"
+                                                 MinHeight="48"
+                                                 VerticalAlignment="Center"
+                                                 ToolTip="Текст резолюции. Упомяните исполнителя как @ФамилияИО — он получит уведомление." />
+                                        <Button Grid.Column="1"
+                                                Content="Наложить резолюцию"
+                                                Command="{Binding AddResolutionCommand}"
+                                                Padding="8,4"
+                                                VerticalAlignment="Center"
+                                                ToolTip="Доступно руководителю и администратору" />
+                                    </Grid>
+                                </DockPanel>
                             </Border>
-                            <Border DockPanel.Dock="Bottom" Background="#F9FAFB" CornerRadius="4" Padding="8" Margin="0,8,0,0">
-                                <StackPanel Orientation="Horizontal">
-                                    <Button Content="Отметить выполненным"
-                                            Command="{Binding CompleteTaskCommand}"
-                                            Padding="8,4" Margin="0,0,6,0" />
-                                    <Button Content="Отменить поручение"
-                                            Command="{Binding CancelTaskCommand}"
-                                            Padding="8,4" Margin="0,0,18,0" />
-                                    <TextBlock Text="Переназначить:" VerticalAlignment="Center" Margin="0,0,6,0" />
-                                    <ComboBox ItemsSource="{Binding Employees}"
-                                              SelectedItem="{Binding ReassignTaskExecutor}"
-                                              DisplayMemberPath="FullName"
-                                              IsEditable="True"
-                                              IsTextSearchEnabled="True"
-                                              TextSearch.TextPath="FullName"
-                                              MinWidth="200" Padding="6" Margin="0,0,6,0" />
-                                    <Button Content="Переназначить"
-                                            Command="{Binding ReassignTaskCommand}"
-                                            Padding="8,4" />
-                                </StackPanel>
-                            </Border>
-                            <DataGrid ItemsSource="{Binding Tasks}"
-                                      SelectedItem="{Binding SelectedTask, UpdateSourceTrigger=PropertyChanged}"
+                            <DataGrid Grid.Row="1"
+                                      ItemsSource="{Binding Resolutions}"
                                       AutoGenerateColumns="False"
                                       CanUserAddRows="False" CanUserDeleteRows="False"
-                                      IsReadOnly="True">
+                                      IsReadOnly="True"
+                                      Margin="0,0,0,8">
                                 <DataGrid.Columns>
-                                    <DataGridTextColumn Header="№" Binding="{Binding Id}" Width="40" />
-                                    <DataGridTextColumn Header="Описание" Binding="{Binding Description}" Width="*" />
-                                    <DataGridTextColumn Header="Исполнитель" Binding="{Binding Executor.FullName, FallbackValue=''}" Width="160" />
-                                    <DataGridTextColumn Header="Срок" Binding="{Binding Deadline, StringFormat=dd.MM.yyyy}" Width="100" />
-                                    <DataGridTextColumn Header="Статус" Binding="{Binding Status, Converter={StaticResource EnumDisplayConverter}}" Width="120" />
-                                    <DataGridTextColumn Header="Завершено" Binding="{Binding CompletedAt, StringFormat=dd.MM.yyyy}" Width="100" />
+                                    <DataGridTextColumn Header="Дата" Binding="{Binding IssuedAt, StringFormat=dd.MM.yyyy HH:mm}" Width="140" />
+                                    <DataGridTextColumn Header="Автор" Binding="{Binding Author.FullName, FallbackValue=''}" Width="180" />
+                                    <DataGridTextColumn Header="Текст резолюции" Binding="{Binding Text}" Width="*" />
                                 </DataGrid.Columns>
                             </DataGrid>
-                        </DockPanel>
+
+                            <!-- Поручения по документу -->
+                            <Border Grid.Row="2" Background="#F9FAFB" CornerRadius="4" Padding="8" Margin="0,0,0,8">
+                                <DockPanel>
+                                    <TextBlock DockPanel.Dock="Top"
+                                               Text="Поручения по документу"
+                                               FontWeight="SemiBold"
+                                               Margin="0,0,0,6" />
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="220" />
+                                            <ColumnDefinition Width="120" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBox Text="{Binding NewTaskDescription, UpdateSourceTrigger=PropertyChanged}"
+                                                 Margin="0,0,6,0" Padding="6"
+                                                 VerticalAlignment="Center"
+                                                 ToolTip="Описание поручения" />
+                                        <ComboBox Grid.Column="1"
+                                                  ItemsSource="{Binding Employees}"
+                                                  SelectedItem="{Binding NewTaskExecutor}"
+                                                  DisplayMemberPath="FullName"
+                                                  IsEditable="True"
+                                                  IsTextSearchEnabled="True"
+                                                  StaysOpenOnEdit="True"
+                                                  TextSearch.TextPath="FullName"
+                                                  ToolTip="Исполнитель — начните вводить ФИО"
+                                                  Margin="0,0,6,0" Padding="6"
+                                                  VerticalAlignment="Center" />
+                                        <DatePicker Grid.Column="2"
+                                                    SelectedDate="{Binding NewTaskDeadline}"
+                                                    Margin="0,0,6,0" />
+                                        <Button Grid.Column="3"
+                                                Content="Создать поручение"
+                                                Command="{Binding AddTaskCommand}"
+                                                Padding="8,4" />
+                                    </Grid>
+                                </DockPanel>
+                            </Border>
+                            <DockPanel Grid.Row="3">
+                                <Border DockPanel.Dock="Bottom" Background="#F9FAFB" CornerRadius="4" Padding="8" Margin="0,8,0,0">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Button Content="Отметить выполненным"
+                                                Command="{Binding CompleteTaskCommand}"
+                                                Padding="8,4" Margin="0,0,6,0" />
+                                        <Button Content="Отменить поручение"
+                                                Command="{Binding CancelTaskCommand}"
+                                                Padding="8,4" Margin="0,0,18,0" />
+                                        <TextBlock Text="Переназначить:" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                        <ComboBox ItemsSource="{Binding Employees}"
+                                                  SelectedItem="{Binding ReassignTaskExecutor}"
+                                                  DisplayMemberPath="FullName"
+                                                  IsEditable="True"
+                                                  IsTextSearchEnabled="True"
+                                                  TextSearch.TextPath="FullName"
+                                                  MinWidth="200" Padding="6" Margin="0,0,6,0" />
+                                        <Button Content="Переназначить"
+                                                Command="{Binding ReassignTaskCommand}"
+                                                Padding="8,4" />
+                                    </StackPanel>
+                                </Border>
+                                <DataGrid ItemsSource="{Binding Tasks}"
+                                          SelectedItem="{Binding SelectedTask, UpdateSourceTrigger=PropertyChanged}"
+                                          AutoGenerateColumns="False"
+                                          CanUserAddRows="False" CanUserDeleteRows="False"
+                                          IsReadOnly="True">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="№" Binding="{Binding Id}" Width="40" />
+                                        <DataGridTextColumn Header="Описание" Binding="{Binding Description}" Width="*" />
+                                        <DataGridTextColumn Header="Исполнитель" Binding="{Binding Executor.FullName, FallbackValue=''}" Width="160" />
+                                        <DataGridTextColumn Header="Срок" Binding="{Binding Deadline, StringFormat=dd.MM.yyyy}" Width="100" />
+                                        <DataGridTextColumn Header="Статус" Binding="{Binding Status, Converter={StaticResource EnumDisplayConverter}}" Width="120" />
+                                        <DataGridTextColumn Header="Завершено" Binding="{Binding CompletedAt, StringFormat=dd.MM.yyyy}" Width="100" />
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </DockPanel>
+                        </Grid>
                     </TabItem>
 
                     <TabItem Header="4. Согласование и маршрут">
@@ -431,7 +493,7 @@
                         <DockPanel Margin="8">
                             <Border DockPanel.Dock="Top" Background="#FEF3C7" BorderBrush="#F59E0B"
                                     BorderThickness="1" CornerRadius="4" Padding="6,3" Margin="0,0,0,6"
-                                    Visibility="{Binding SelectedDocument.IsLocked, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                    Visibility="{Binding IsDocumentLocked, Converter={StaticResource BooleanToVisibilityConverter}}">
                                 <TextBlock Text="🔒 Документ заблокирован квалифицированной подписью. Можно менять только статус, исполнителя и гриф доступа."
                                            Foreground="#92400E" TextWrapping="Wrap" />
                             </Border>
@@ -442,6 +504,10 @@
                                         MinWidth="130" Padding="6,3" Margin="0,0,6,0" />
                                 <Button Content="Отозвать" Command="{Binding RevokeSignatureCommand}"
                                         MinWidth="100" Padding="6,3" Margin="0,0,12,0" />
+                                <Button Content="Снять блокировку"
+                                        Command="{Binding UnlockDocumentCommand}"
+                                        ToolTip="Только для ролей Admin и Manager. Снимает программную блокировку документа (запись в журнал аудита). Не отменяет ранее наложенные подписи КЭП."
+                                        MinWidth="140" Padding="6,3" Margin="0,0,6,0" />
                             </StackPanel>
                             <Grid DockPanel.Dock="Top" Margin="0,0,0,8">
                                 <Grid.ColumnDefinitions>

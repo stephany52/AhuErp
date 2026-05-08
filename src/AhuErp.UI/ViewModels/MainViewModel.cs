@@ -4,8 +4,10 @@ using System.Linq;
 using AhuErp.Core.Services;
 using AhuErp.UI.Converters;
 using AhuErp.UI.Infrastructure;
+using AhuErp.UI.Messaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.Mvvm.Messaging;
 
 namespace AhuErp.UI.ViewModels
 {
@@ -57,7 +59,8 @@ namespace AhuErp.UI.ViewModels
                              MyDesktopViewModel myDesktopVm,
                              NotificationPrefsViewModel notificationPrefsVm,
                              INotificationService notifications,
-                             IDocumentNavigator navigator = null)
+                             IDocumentNavigator navigator = null,
+                             IMessenger messenger = null)
         {
             _auth = auth ?? throw new ArgumentNullException(nameof(auth));
             _notifications = notifications ?? throw new ArgumentNullException(nameof(notifications));
@@ -66,6 +69,16 @@ namespace AhuErp.UI.ViewModels
             // Регистрируемся в навигаторе документов, чтобы карточки и
             // уведомления на «Моём рабочем столе» могли открывать РКК.
             (navigator as DocumentNavigator)?.AttachMain(this);
+
+            // Bug #2 — слушаем шину сообщений: MyDesktopViewModel.MarkRead
+            // публикует UnreadCountChangedMessage, мы обновляем бейдж в шапке
+            // без прямой ссылки между VM-ами. Используем перегрузку
+            // Register&lt;TRecipient,TMessage&gt; со static-лямбдой, иначе
+            // closure захватит this, и WeakReferenceMessenger будет вечно
+            // удерживать MainViewModel со всеми его транзиентными зависимостями
+            // (Dashboard, Office, Rkk и т.д.) на каждом цикле logout/re-login.
+            (messenger ?? WeakReferenceMessenger.Default).Register<MainViewModel, UnreadCountChangedMessage>(
+                this, static (recipient, msg) => recipient.UnreadNotifications = msg.Value);
 
             NavigationItems = new ObservableCollection<NavigationItem>
             {

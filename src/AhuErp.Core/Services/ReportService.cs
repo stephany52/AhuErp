@@ -497,6 +497,7 @@ namespace AhuErp.Core.Services
                 case DocumentStatus.OnHold: return "Отложен";
                 case DocumentStatus.Completed: return "Завершён";
                 case DocumentStatus.Cancelled: return "Отменён";
+                case DocumentStatus.Registered: return "Зарегистрирован";
                 default: return s.ToString();
             }
         }
@@ -568,6 +569,7 @@ namespace AhuErp.Core.Services
                 case AuditActionType.SignatureAdded: return "Подписание";
                 case AuditActionType.SignatureRevoked: return "Отзыв подписи";
                 case AuditActionType.DocumentLocked: return "Блокировка КЭП";
+                case AuditActionType.DocumentUnlocked: return "Разблокировка";
                 case AuditActionType.NotificationSent: return "Уведомление";
                 case AuditActionType.SubstitutionCreated: return "Замещение создано";
                 case AuditActionType.SubstitutionCancelled: return "Замещение отменено";

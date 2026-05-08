@@ -1,54 +1,203 @@
-# AhuErp — ERP/EDMS для МКУ АХУ БМР
+# AhuErp — ERP/СЭД для МКУ «АХУ» БМР
 
-Phase 1 (Foundation) комплексной системы управления документооборотом и административно-хозяйственной деятельностью. Заложен архитектурный фундамент: строгий MVVM, чистое разделение доменной модели, EF6 Code-First и покрытие бизнес-логики unit-тестами.
+Информационная система административно-хозяйственного управления и
+электронного документооборота для **МКУ «АХУ» БМР** (Балаковский муниципальный
+район). Покрывает ключевые направления деятельности учреждения:
+делопроизводство (РКК с полным жизненным циклом), архивный отдел, склад/ТМЦ,
+ИТО (Help Desk), транспортный отдел, оргструктура и замещения, аналитика и
+регламентные отчёты.
+
+**Стек:** .NET Framework 4.8 (SDK-style csproj), WPF + MVVM
+(`CommunityToolkit.Mvvm` 8.3), Entity Framework 6.4.4 Code-First +
+12 миграций, xUnit 2.9, ClosedXML 0.102, DocumentFormat.OpenXml 2.20,
+LiveCharts.Wpf 0.9.7, PdfPig (полнотекстовая индексация PDF), PBKDF2
+для парольных хэшей, Microsoft.Extensions.DependencyInjection.
+
+**Размер:** ~25 ViewModel-ей, ~25 Views, ~30 моделей домена, ~30 сервисов
+(`AhuErp.Core/Services`), 12 EF6-миграций. Тесты: **235 / 235 passed**
+на `main` (CI зелёный после релиза приёмочных фиксов; ветки текущих багфиксов
+поднимают эту цифру до 244 — см. раздел Roadmap).
+
+---
 
 ## Архитектура
 
 ```
 AhuErp.sln
 ├── src/
-│   ├── AhuErp.Core/     ← .NET Framework 4.8, SDK-style class library
-│   │   ├── Models/      ← Employee, Document, ArchiveRequest (TPH), Vehicle, VehicleTrip
-│   │   ├── Data/        ← AhuDbContext (EF6)
-│   │   ├── Migrations/  ← EF6 Code-First миграции (+ .resx snapshot)
-│   │   └── Services/    ← ArchiveService, FleetService, DashboardService
-│   └── AhuErp.UI/       ← .NET Framework 4.8, SDK-style WPF Application (UseWPF)
-│       ├── App.xaml/.cs
-│       ├── MainWindow.xaml/.cs   ← только InitializeComponent()
-│       ├── ViewModels/  ← MVVM на CommunityToolkit.Mvvm
-│       ├── Views/       ← DashboardView, PlaceholderView
-│       └── Converters/  ← OverdueRowColorConverter
+│   ├── AhuErp.Core/            ← .NET 4.8, SDK-style class library
+│   │   ├── Models/             ← домен: Document (TPH: ArchiveRequest, ItTicket),
+│   │   │                         Employee, Department, NomenclatureCase, DocumentTask,
+│   │   │                         DocumentResolution, DocumentApproval, DocumentSignature,
+│   │   │                         DocumentAttachment, AuditLog, Notification,
+│   │   │                         NotificationPreference, Substitution, TaskDelegation,
+│   │   │                         InventoryItem, InventoryTransaction, Vehicle, VehicleTrip,
+│   │   │                         AttachmentTextIndex, SavedSearch, …
+│   │   ├── Data/AhuDbContext.cs← EF6 контекст, TPH-маппинги, FK-конфигурация
+│   │   ├── Migrations/         ← 12 EF6 миграций (Phase 1 → 12) + .resx-снимки
+│   │   └── Services/           ← бизнес-логика: AuthService, RolePolicy,
+│   │                             ApprovalService, SignatureService, TaskService,
+│   │                             NomenclatureService, InventoryService, FleetService,
+│   │                             ArchiveService, NotificationService, SearchIndexService,
+│   │                             SavedSearchService, ReportService, AuditService,
+│   │                             SubstitutionService, DelegationService,
+│   │                             AttachmentService, WorkflowService, DashboardService,
+│   │                             + `Ef*Repository` (production) и `InMemory*Repository`
+│   │                             (для тестов и быстрых демонстраций)
+│   └── AhuErp.UI/              ← .NET 4.8 SDK-style WPF Application (UseWPF=true)
+│       ├── App.xaml(.cs)       ← bootstrapping: DI → LoginWindow → MainWindow
+│       │                         + DispatcherTimer-ы (TickReminders, IndexOutdated)
+│       ├── Infrastructure/     ← AppServices (DI-композишн-рут), EfDataSeeder,
+│       │                         DemoDataSeeder, FileDialogService, DocumentNavigator
+│       ├── ViewModels/         ← MVVM на CommunityToolkit.Mvvm
+│       ├── Views/              ← XAML-формы по разделам навигации
+│       ├── Messaging/          ← IMessenger-сообщения (UnreadCountChangedMessage и др.)
+│       └── Converters/         ← BooleanToVisibility, EnumDisplay,
+│                                 OverdueRowColor, InventoryDeltaSign, …
 └── tests/
-    └── AhuErp.Tests/    ← xUnit, 21 тест
+    └── AhuErp.Tests/           ← xUnit, 235 тестов на main
 ```
 
-Все три проекта — SDK-style `.csproj`, `TargetFramework=net48`, что позволяет
-`dotnet build` / `dotnet test` / `dotnet format` работать без Visual Studio
-(в том числе на CI под Linux через `Microsoft.NETFramework.ReferenceAssemblies`).
+Все три проекта — SDK-style `.csproj` с `TargetFramework=net48`, что позволяет
+`dotnet build` / `dotnet test` / `dotnet format` работать **без Visual Studio**
+(в том числе на CI под Linux через
+`Microsoft.NETFramework.ReferenceAssemblies 1.0.3`). EF6 контекст — singleton,
+живёт всё время сессии WPF-приложения (UI-однопоточное, обращения с UI-нити).
 
-## Бизнес-логика (Phase 1)
+---
+
+## Модули и роли
+
+`MainViewModel` строит панель навигации из 17 разделов и фильтрует их через
+`RolePolicy.IsAllowed(role, moduleKey)`.
+
+| #  | Раздел                       | Роли с доступом                                     | Что внутри                                                                 |
+|----|------------------------------|-----------------------------------------------------|----------------------------------------------------------------------------|
+| 1  | Мой рабочий стол             | Admin, Manager, Archivist, TechSupport, WhMgr       | KPI-карточки + лента уведомлений + последние документы по сотруднику       |
+| 2  | Дашборд                      | Admin, Manager, Archivist, TechSupport, WhMgr       | KPI + LiveCharts (PieChart по статусам, ColumnChart по категориям ТМЦ)     |
+| 3  | РКК (документы)              | Admin, Manager, WhMgr                               | Полная регистрационно-контрольная карточка: 6 вкладок                      |
+| 4  | Документационное обеспечение | Admin, Manager, Archivist, TechSupport, WhMgr       | Реестр входящих/внутренних документов                                      |
+| 5  | Мои задачи                   | Admin, Manager, Archivist, TechSupport, WhMgr       | Поручения текущему пользователю с дедлайнами и контролем                   |
+| 6  | Архивный отдел               | Admin, Manager, Archivist                           | Заявки граждан, архивные справки (DOCX), сроки 7/15/30 дней                |
+| 7  | Склад / ТМЦ                  | Admin, Manager, WhMgr                               | Остатки, приход/расход с привязкой к документу-основанию, фильтры          |
+| 8  | ИТО                          | Admin, Manager, TechSupport                         | Help Desk: `ItTicket`, разрешение с опциональным списанием расходников     |
+| 9  | Транспорт                    | Admin, Manager, WhMgr                               | Парк, расписание, бронирование с проверкой пересечений (Allen)             |
+| 10 | Номенклатура дел             | Admin, Manager, Archivist                           | Дела по индексам, сроки хранения по перечню                                |
+| 11 | Журналы регистрации          | Admin, Manager, Archivist                           | Реестры по типам документов (входящие, исходящие, внутренние, и т.п.)      |
+| 12 | Поиск                        | все роли                                            | Полнотекстовый поиск по вложениям + сохранённые фильтры                    |
+| 13 | Отчёты                       | Admin, Manager, Archivist, WhMgr                    | Регламентные отчёты (XLSX/DOCX/PDF)                                        |
+| 14 | Оргструктура                 | Admin                                               | Иерархия отделов + назначение руководителей                                |
+| 15 | Замещения                    | Admin, Manager, Archivist, TechSupport, WhMgr       | Активные замещения сотрудников + автоперенаправление задач                 |
+| 16 | Уведомления (настройки)      | Admin, Manager, Archivist, TechSupport, WhMgr       | Включение/отключение каналов (in-app / email) по типам событий             |
+| 17 | Журнал аудита                | Admin                                               | Хэш-цепочка событий (доступ, экспорт, подписи, изменения)                  |
+
+Роли: `Admin`, `Manager`, `Archivist`, `TechSupport`, `WarehouseManager`.
+Дополнительные поведенческие проверки в `RolePolicy.Can*(role)`:
+`CanSign`, `CanSignQualified`, `CanManageOrgStructure`, `CanCreateSubstitution`,
+`CanViewReports`, `CanCancelRelatedOperation`, `CanRebuildSearchIndex`,
+`CanFullTextSearch`, `CanManageSavedSearches`, `CanManageNotificationPrefs`,
+`CanIssueResolution`.
+
+---
+
+## Phases (хронология реализации)
+
+Для ориентира ниже краткая шкала, как нарастал функционал. Подробный diff —
+в конкретных миграциях `src/AhuErp.Core/Migrations/` и истории коммитов.
+
+| Phase | Тема                                                | Ключевые артефакты                                                                              |
+|-------|-----------------------------------------------------|-------------------------------------------------------------------------------------------------|
+| 1     | Foundation                                          | `AhuDbContext`, `Document/ArchiveRequest/Vehicle/VehicleTrip`, `ArchiveService`, `FleetService`, `DashboardService`, миграция `InitialCreate` |
+| 2     | DI + аутентификация + CRUD-экраны                   | `Microsoft.Extensions.DependencyInjection`, `IAuthService`, PBKDF2 `Pbkdf2PasswordHasher`, `EmployeeRole`, `RolePolicy`, миграция `AddEmployeeAuth` |
+| 3     | Склад / ТМЦ + ИТО (Help Desk)                       | `InventoryItem`, `InventoryTransaction`, `ItTicket` (TPH), `IInventoryService`, миграция `AddInventoryAndItTicket` |
+| 4     | Транспорт                                           | `IVehicleRepository`, перегрузка `FleetService.BookVehicle(vehicleId, documentId, …)`, миграция `AddVehicleTripDriverName` |
+| 5     | Аналитика и экспорт отчётов                         | `IReportService` (XLSX через ClosedXML, DOCX через OpenXml), `IFileDialogService`, KPI-карточки и LiveCharts на `DashboardView` |
+| 6     | EF6 в production                                    | Все четыре репозитория (`EfDocumentRepository`, `EfEmployeeRepository`, `EfInventoryRepository`, `EfVehicleRepository`) подменяют in-memory; в `AppServices` регистрируется `AhuDbContext` (singleton) |
+| 7     | Промышленный СЭД-уровень                            | Справочники `Departments` / `DocumentTypeRefs` / `NomenclatureCases`; вложения с версиями (`DocumentAttachment`); резолюции и поручения (`DocumentResolution`, `DocumentTask`); маршруты согласования (`ApprovalRouteTemplate` / `ApprovalStage` / `DocumentApproval`); журнал аудита (`AuditLog`) с hash-цепочкой; ссылка `BasisDocumentId`; миграция `AddEnterpriseEDMSFeatures` |
+| 8     | Электронные подписи + блокировка документа          | `DocumentSignature` + `SignatureKind` (Simple/Qualified), `ICryptoProvider` (HMAC для Simple, `CryptoProStub` для Qualified-канала), `DocumentLockGuard`, миграция `AddSignatures` |
+| 9     | Уведомления + рабочий стол                          | `Notification`, `NotificationPreference`, `INotificationService` (in-app + e-mail через `IEmailGateway`), `MyDesktopViewModel`, кликабельный бейдж непрочитанных в шапке, `DispatcherTimer` `TickReminders`, миграция `AddNotifications` |
+| 10    | Полнотекстовый поиск                                | `AttachmentTextIndex`, `SavedSearch`, `SearchIndexService`, экстракторы `Pdf` / `Docx` / `PlainText`, фоновый `IndexOutdated` каждые 5 мин, миграция `AddSearchIndex` |
+| 11    | Оргструктура + замещения + делегирование задач      | Иерархия `Department`, `Substitution`, `TaskDelegation`, `SubstitutionService` подменяет исполнителя в `TaskService` / `ApprovalService` при активном замещении, миграция `AddOrgAndSubstitution` |
+| 12    | Регламентные отчёты + локализация UI                | Отчёты в XLSX / DOCX / PDF, русские подписи всех enum в UI и отчётах, `EnumDisplayConverter` |
+
+Дополнительная миграция `AddInventoryItemUnitAndMinimumBalance` добавляет
+поля единиц измерения и минимального остатка к `InventoryItem`.
+
+---
+
+## Бизнес-инварианты (проверены тестами)
 
 ### Архив
-- `ArchiveService.CreateRequest(...)` создаёт социально-правовой, тематический или платный тематический запрос, либо запрос копии муниципального правового акта.
-- Регламентные сроки МКУ «АХУ» БМР: 30 рабочих дней для справок/выписок, 15 рабочих дней для копий муниципальных правовых актов, 7 рабочих дней на перенаправление непрофильного заявления.
-- `ArchiveRequest.CanCompleteRequest()` требует скан-копии паспорта и трудовой книжки только для социально-правовых запросов.
-- `ArchiveService.CompleteRequest(...)` бросает `InvalidOperationException`, если предварительные условия не соблюдены.
+- `ArchiveService.CreateRequest(...)` создаёт социально-правовой, тематический,
+  платный тематический запрос или запрос копии муниципального правового акта.
+- Регламентные сроки МКУ «АХУ» БМР: **30 рабочих дней** для справок/выписок,
+  **15 рабочих дней** для копий муниципальных правовых актов, **7 рабочих
+  дней** на перенаправление непрофильного заявления.
+- `ArchiveRequest.CanCompleteRequest()` требует скан-копии паспорта и трудовой
+  книжки **только** для социально-правовых запросов.
+- `CompleteRequest` бросает `InvalidOperationException`, если предусловия не
+  соблюдены.
 
-### Автопарк
-- `FleetService.BookVehicle(vehicle, start, end, existingTrips?)` создаёт путевой лист.
-- Бросает `VehicleBookingException`, если:
-  - ТС в статусе `Maintenance`;
-  - интервал пересекается с уже существующей поездкой (`Allen-overlap`);
-  - `end <= start`.
+### Транспорт
+- `FleetService.BookVehicle(vehicleId, documentId, start, end, driverName)`
+  создаёт путевой лист только при заполненных `documentId` и `driverName`.
+- Бросает `VehicleBookingException`, если ТС в `Maintenance`, `end <= start`
+  или интервал пересекается с существующей поездкой по Allen-алгоритму
+  (полуоткрытые `[start, end)` — стыковка не считается пересечением).
 
-### Дашборд
-- `DashboardService.CountOverdue(docs, now)` — документы с `Deadline < now` и `Status ∉ {Completed, Cancelled}`.
-- `DashboardService.CountDueSoon(docs, now, daysThreshold=3)` — активные документы с дедлайном в ближайшие N суток.
+### Склад / ТМЦ
+- `InventoryService.ProcessTransaction(itemId, quantityChange, documentId?, userId)`
+  атомарно обновляет `TotalQuantity` и пишет движение.
+- Списание (`quantityChange < 0`) обязательно требует `documentId` и не
+  допускает овердрафт. Любое движение всегда привязано к инициатору
+  (`InitiatorId`).
+- Базовая трассировка «движение → документ-основание» через
+  `BasisDocumentId` (Phase 7): связывает хозяйственную операцию с приказом /
+  служебной запиской.
 
-### UI / MVVM
-- `MainViewModel` держит `ObservableCollection<NavigationItem>` и свойство `CurrentViewModel`.
-- Сайдбар: «Дашборд / Документационное обеспечение / Архивный отдел / Склад / ТМЦ / ИТО / Транспорт», каждая кнопка через `RelayCommand` переключает `SelectedNavigationItem`.
-- `OverdueRowColorConverter` — `IValueConverter`, возвращающий `Red` / `Yellow` / `Transparent` в зависимости от `Document.Deadline` и `Status`.
+### Регистрация документов
+- `NomenclatureService.Register(documentId, caseId)` присваивает номер по
+  шаблону `{ShortCode}-{CaseIndex}/{Year}-{Sequence:00000}`. При отсутствии
+  дела в `caseId` подставляется `Б/Н` вместо `00`.
+- В `Document` запрещены строки `RegistrationNumber`, содержащие плейсхолдеры
+  `{` / `}` (валидация в `EfDocumentRepository.Save`).
+
+### Подписи и блокировка
+- `SignatureService.Sign(..., kind=Simple)` — **не** меняет `Document.IsLocked`.
+- `SignatureService.Sign(..., kind=Qualified)` — взводит `IsLocked = true` и
+  пишет `AuditActionType.DocumentLocked` в журнал аудита.
+- На заблокированном документе разрешено менять только `Status`, исполнителя
+  (`AssignedEmployeeId`) и гриф доступа (`AccessLevel`); попытка изменить
+  заголовок ловится `DocumentLockGuard` и бросает исключение.
+- Снимать блокировку могут `Admin` / `Manager` через `SignatureService.Unlock`,
+  событие пишется в аудит.
+
+### Согласование
+- `ApprovalService.Start(...)` собирает маршрут по
+  `ApprovalRouteTemplate`/`ApprovalStage` и создаёт `DocumentApproval`-стадии.
+- `Approve` / `Reject` корректно учитывают активные `Substitution`-замещения:
+  если штатный согласующий замещается, задание уходит замещающему.
+
+### Поиск
+- `SearchIndexService.IndexOutdated()` догоняет новые/обновлённые вложения,
+  извлекает текст через `PdfTextExtractor` / `DocxTextExtractor` /
+  `PlainTextExtractor` и кладёт в `AttachmentTextIndex.ExtractedText`.
+- Удаление `Document` / `DocumentAttachment` каскадно удаляет индексные строки.
+
+### Уведомления
+- `INotificationService` доставляет события через in-app и опционально e-mail
+  (`IEmailGateway`). По умолчанию в DI зарегистрирован `NoOpEmailGateway`;
+  реальный SMTP включается через `App.config`.
+- `TickReminders(now)` в `DispatcherTimer` создаёт `TaskDeadlineSoon` /
+  `TaskOverdue`-напоминания **с дедупликацией на сотрудника-получателя**.
+
+### Замещения
+- `Substitution` (`OriginalEmployeeId` → `SubstituteEmployeeId`,
+  `Scope: Tasks/Approvals/All`, окно `Starts/Ends`).
+- `SubstitutionService.ResolveActor(employeeId, scope, when)` подменяет
+  адресата задачи или согласующего на замещающего.
+
+---
 
 ## Быстрый старт
 
@@ -56,190 +205,216 @@ AhuErp.sln
 
 ```bash
 dotnet restore AhuErp.sln
-dotnet build   AhuErp.sln -c Debug
-dotnet test    AhuErp.sln -c Debug
+dotnet build   AhuErp.sln -c Release
+dotnet test    AhuErp.sln --no-build -c Release
 dotnet format  AhuErp.sln --verify-no-changes --exclude src/AhuErp.Core/Migrations
 ```
 
-Ожидаемый результат: **0 errors, 0 warnings, 21/21 passed**.
+Ожидаемый результат: **0 errors, 0 warnings, 235 / 235 passed** на `main`.
+В проектах `AhuErp.Core` / `AhuErp.UI` включён `TreatWarningsAsErrors`, в
+`AhuErp.Tests` — нет (xunit-аналитики дают советы, не упирающиеся в баг).
 
 ### Запуск WPF приложения
 
-WPF-приложение рассчитано на Windows (net48). На Windows-машине достаточно:
+WPF-приложение рассчитано на **Windows + .NET Framework 4.8** (Mono на Linux
+не реализует `PresentationFramework`, поэтому `AhuErp.UI.exe` запускается
+только под Windows). На Windows-машине достаточно:
 
 ```powershell
 dotnet run --project src\AhuErp.UI\AhuErp.UI.csproj
 ```
 
-### Логин по умолчанию (Phase 6, EF6-бэкенд)
+или открыть `AhuErp.sln` в Visual Studio 2022, выбрать
+`Set as Startup Project = AhuErp.UI` и нажать F5.
 
-При первом запуске на чистой БД `EfDataSeeder` создаёт одного администратора:
+### Логин по умолчанию
 
-| Поле        | Значение                  |
-|-------------|---------------------------|
-| ФИО         | `Администратор МКУ АХУ БМР` |
-| Пароль      | `password`                |
-| Роль        | `Admin`                   |
+При первом запуске на чистой БД `EfDataSeeder.EnsureSeeded` создаёт одного
+администратора и наполняет справочники Phase 7 (отделы, виды документов,
+номенклатура дел):
 
-Если в БД уже есть строки в `Employees` (например, был раскомментирован сид-блок
-в `scripts/create-db.sql`), но ни у кого нет `PasswordHash` — сидер обновит
-существующего «Администратор МКУ АХУ БМР» (или создаст нового), чтобы вход был возможен.
+| Поле   | Значение                    |
+|--------|-----------------------------|
+| ФИО    | `Администратор МКУ АХУ БМР` |
+| Пароль | `password`                  |
+| Роль   | `Admin`                     |
 
-## Phase 6: переключение DI с in-memory на EF6
+Если в `Employees` уже есть записи (например, после `scripts/create-db.sql`),
+но ни у кого нет `PasswordHash` — сидер обновит существующего
+«Администратор МКУ АХУ БМР» (или создаст нового), чтобы вход был возможен.
 
-Начиная с Phase 6 все четыре репозитория зарегистрированы как EF6-реализации
-поверх `AhuDbContext` (`EfDocumentRepository`, `EfEmployeeRepository`,
-`EfInventoryRepository`, `EfVehicleRepository`). Контекст — singleton, обращения
-с UI-потока, тесты остаются на in-memory (быстрые, без SQL Server).
+> Дополнительные демо-сотрудники с ролями `Manager`, `Archivist`,
+> `TechSupport`, `WarehouseManager` (пароль везде `password`) сидируются
+> через `DemoDataSeeder` — он не вызывается автоматически из `App.xaml.cs`,
+> а используется в xUnit-тестах и сценариях ручной проверки.
 
-Шаги для запуска на своей машине:
+---
 
-1. Установить SQL Server Express (или подключить LocalDB / удалённый сервер).
-2. Накатить схему скриптом `scripts/create-db.sql` (SSMS → File → Open → F5).
-3. Поправить `src/AhuErp.UI/App.config` под свой инстанс, например:
-   ```xml
-   <add name="AhuErpDb"
-        providerName="System.Data.SqlClient"
-        connectionString="Server=DESKTOP-PC\SQLEXPRESS;Database=AhuErpDb;Integrated Security=true;MultipleActiveResultSets=True;" />
-   ```
-4. Собрать и запустить (`Set as Startup Project = AhuErp.UI`, F5).
+## Подключение к SQL Server
 
-## Применение EF6 миграции к SQL Server
+Контекст ищет connection string `AhuErpDb`. По умолчанию `App.config`
+указывает на `(localdb)\MSSQLLocalDB`:
 
-Миграция `20260423121238_InitialCreate` разворачивает полную схему первой фазы.
+```xml
+<add name="AhuErpDb"
+     providerName="System.Data.SqlClient"
+     connectionString="Server=(localdb)\MSSQLLocalDB;Database=AhuErpDb;Integrated Security=true;MultipleActiveResultSets=True;" />
+```
 
-### Вариант 1. Через `Update-Database` в Package Manager Console (Visual Studio)
+Под свой стенд правьте `src/AhuErp.UI/App.config`, например:
 
-1. Убедитесь, что `App.config` в `AhuErp.UI` (или свой config под ваш стенд) содержит connection string `AhuErpDb`. По умолчанию задано:
-   ```
-   Server=(localdb)\MSSQLLocalDB;Database=AhuErpDb;Integrated Security=true
-   ```
-2. В PMC выберите Default project = `AhuErp.Core`, StartUp project = `AhuErp.UI`.
-3. Выполните:
-   ```powershell
-   Update-Database -Verbose
-   ```
+```xml
+<add name="AhuErpDb"
+     providerName="System.Data.SqlClient"
+     connectionString="Server=DESKTOP-PC\SQLEXPRESS;Database=AhuErpDb;Integrated Security=true;MultipleActiveResultSets=True;" />
+```
 
-### Вариант 2. Через `migrate.exe` (без Visual Studio)
+### Создание схемы
 
-`migrate.exe` поставляется в NuGet-пакете `EntityFramework` в папке `tools`. После `dotnet build`:
+Есть три способа поднять БД.
+
+**Вариант 1 — `Update-Database` в Package Manager Console (Visual Studio).**
 
 ```powershell
-# Windows
+# PMC: Default project = AhuErp.Core, StartUp project = AhuErp.UI
+Update-Database -Verbose
+```
+
+**Вариант 2 — `migrate.exe` без Visual Studio.** `migrate.exe` поставляется в
+NuGet-пакете `EntityFramework` в папке `tools`:
+
+```powershell
 cp $env:USERPROFILE\.nuget\packages\entityframework\6.4.4\tools\migrate.exe `
-   src\AhuErp.Core\bin\Debug\
-cd src\AhuErp.Core\bin\Debug
-.\migrate.exe AhuErp.Core.dll /connectionStringName="AhuErpDb" /startUpConfigurationFile="..\..\..\AhuErp.UI\App.config" /verbose
+   src\AhuErp.Core\bin\Release\
+cd src\AhuErp.Core\bin\Release
+.\migrate.exe AhuErp.Core.dll /connectionStringName="AhuErpDb" `
+              /startUpConfigurationFile="..\..\..\..\AhuErp.UI\App.config" /verbose
 ```
 
-### Вариант 3. Сгенерировать идемпотентный T-SQL скрипт
+**Вариант 3 — `scripts/create-db.sql`.** Готовый T-SQL, разворачивающий схему
+последней миграции одним прогоном; удобно для CI/CD и SSMS.
 
 ```powershell
-Update-Database -Script -SourceMigration $InitialDatabase -TargetMigration InitialCreate -Verbose
+sqlcmd -S "(localdb)\MSSQLLocalDB" -d master -i scripts\create-db.sql
 ```
 
-Полученный `.sql` можно применить через `sqlcmd`, SSMS или любой CI/CD-пайплайн.
-
-## Регенерация миграции в Linux / CI
+### Регенерация миграций в Linux / CI
 
 Вспомогательный проект `tools/MigrationGenerator` позволяет скаффолдить EF6
-миграции в среде без Visual Studio (в том числе в Linux через `mono`):
+миграции в среде без Visual Studio (в том числе в Linux через Mono):
 
 ```bash
 dotnet build tools/MigrationGenerator/MigrationGenerator.csproj
 mono tools/MigrationGenerator/bin/Debug/MigrationGenerator.exe \
-     src/AhuErp.Core/Migrations InitialCreate
+     src/AhuErp.Core/Migrations <MigrationName>
 ```
 
-## Стек
+Под Windows есть готовый bat-скрипт `tools/regen-migrations.bat`,
+автоматически пересобирающий проект и встраивающий свежий `.resx`-снимок.
 
-- .NET Framework 4.8 (SDK-style `.csproj`)
-- WPF + MVVM (`CommunityToolkit.Mvvm` 8.3)
-- Entity Framework 6.4.4 (Code-First + Migrations)
-- xUnit 2.9
-- Ref. assemblies: `Microsoft.NETFramework.ReferenceAssemblies 1.0.3`
+---
 
-## Phase 2 — DI, Authentication & Office/Archive CRUD
-
-- Добавлен DI-контейнер `Microsoft.Extensions.DependencyInjection` в `App.xaml.cs`, регистрирующий сервисы (`IAuthService`, `IPasswordHasher`, репозитории) и все ViewModel-и.
-- `EmployeeRole` (Admin / Manager / Archivist / TechSupport / WarehouseManager) и `PasswordHash` добавлены к `Employee`. Миграция `AddEmployeeAuth` (`20260423125626`) добавляет соответствующие колонки.
-- `IAuthService`/`AuthService` + PBKDF2-`Pbkdf2PasswordHasher` с константным сравнением. `LoginWindow` показывается первым при старте приложения; `MainWindow` открывается только после успешной аутентификации.
-- RBAC: `RolePolicy` — декларативная таблица «роль → доступные модули»; `MainViewModel` фильтрует `NavigationItems` по текущему пользователю, `BooleanToVisibilityConverter` скрывает недоступные пункты меню.
-- CRUD экраны «Отдел документационного обеспечения» (Incoming/Internal документы, `OfficeView`) и «Архивный отдел» (`ArchiveRequest` со скан-чекбоксами и действием «Завершить», `ArchiveView`) — работают поверх `IDocumentRepository` (in-memory на Phase 2, EF6 на Phase 3+).
-- Демо-пользователи (пароль `password`): «Администратор МКУ АХУ БМР» (Admin), «Стерликов Дмитрий Николаевич» (Manager), «Бурдина Галина Николаевна» (Archivist), «Дорофеев Артем Валерьевич» (TechSupport), «Зайченко Татьяна Александровна» (WarehouseManager).
-- Тесты: **+38** — `AuthServiceTests`, `PasswordHasherTests`, `RolePolicyTests`, `InMemoryDocumentRepositoryTests`. Итого 59 зелёных.
-
-## Phase 3 — Warehouse / ТМЦ + IT-Service (Help Desk)
-
-- Модели: `InventoryItem` (Id, Name, `InventoryCategory`, TotalQuantity), `InventoryTransaction` (InventoryItemId, nullable `DocumentId`, QuantityChanged ±, TransactionDate, InitiatorId), `ItTicket` (наследник `Document` через TPH-дискриминатор — `AffectedEquipment`, `ResolutionNotes`).
-- EF6 миграция `20260423131841_AddInventoryAndItTicket`: две новые таблицы + FK `InventoryTransactions.DocumentId → Documents`, `InitiatorId → Employees`, колонки `AffectedEquipment`/`ResolutionNotes` на `Documents` для TPH-подтипа `ItTicket`.
-- `IInventoryService` / `InventoryService.ProcessTransaction(itemId, quantityChange, documentId?, userId)` — атомарно обновляет `TotalQuantity` и записывает движение. Правила: `quantityChange != 0`, списание требует `documentId`, при этом `TotalQuantity + quantityChange >= 0` (иначе `InvalidOperationException`).
-- UI: `WarehouseView` — грид остатков + панель прихода/расхода (расход обязательно привязан к документу из `IDocumentRepository.ListInventoryEligibleDocuments()` — внутренние распоряжения + IT-заявки) + лента последних 20 движений.
-- UI: `ItServiceView` — CRUD `ItTicket`; при закрытии заявки можно опционально списать расходник со склада — списание проходит через `IInventoryService` с `DocumentId = ticket.Id`, т.е. движение ТМЦ всегда связано с документом (IT-заявкой или приказом).
-- Тесты: **+9** юнит-тестов (`InventoryServiceTests`): приход / расход / запрет овердрафта / обязательность документа при списании / нулевой/невалидный инициатор / отсутствующая позиция / граничный нулевой остаток / трассировка `DocumentId` по нескольким движениям. Итого **68/68**.
-
-### Как реализована связка «движение ТМЦ → документ-основание»
+## Структура хранилища: ключевые таблицы
 
 ```
-InventoryTransaction.DocumentId? ──(FK, ON DELETE NO ACTION)──► Documents.Id
-                                                                   │
-                                                                   ├─ Document         (Incoming / Internal)
-                                                                   ├─ ArchiveRequest   (TPH)
-                                                                   └─ ItTicket         (TPH ← Phase 3)
+Documents (TPH)
+  ├─ DocumentDiscriminator = "Document"        ← обычный документ
+  ├─ DocumentDiscriminator = "ArchiveRequest"  ← запрос в архив (Phase 1)
+  └─ DocumentDiscriminator = "ItTicket"        ← IT-заявка (Phase 3)
+
+DocumentAttachments         (Phase 7, версионируемые вложения)
+DocumentResolutions         (Phase 7, резолюции руководителя)
+DocumentTasks               (Phase 7, поручения с deadline + ParentTaskId)
+DocumentApprovals           (Phase 7, стадии маршрута согласования)
+DocumentSignatures          (Phase 8, простая / квалифицированная)
+DocumentCaseLinks           (Phase 7, привязка к делам номенклатуры)
+
+NomenclatureCases           ← дела по номенклатуре, индекс / срок хранения
+DocumentTypeRefs            ← виды документов + шаблон рег. номера
+Departments                 ← иерархия отделов (Phase 7 + Phase 11)
+
+InventoryItems              ← позиции ТМЦ (Name, Category, Unit, MinimumBalance)
+InventoryTransactions       ← движение, FK на Document + Initiator + BasisDocument
+Vehicles / VehicleTrips     ← парк и поездки
+
+Substitutions               ← замещения сотрудников (Phase 11)
+TaskDelegations             ← делегирование конкретного поручения (Phase 11)
+
+Notifications               ← in-app уведомления (Phase 9)
+NotificationPreferences     ← пользовательские настройки каналов
+
+AttachmentTextIndices       ← полнотекстовый индекс (Phase 10)
+SavedSearches               ← сохранённые фильтры поиска
+
+AuditLogs                   ← хэш-цепочка событий (Phase 7)
 ```
 
-Любое списание через `InventoryService.ProcessTransaction(..., documentId: X, ...)`:
-- валидирует, что `X != null` и позиция имеет достаточный остаток,
-- уменьшает `InventoryItem.TotalQuantity` на абсолютную величину,
-- добавляет запись `InventoryTransaction { QuantityChanged < 0, DocumentId = X, InitiatorId = currentUser.Id, TransactionDate = now }`.
+---
 
-При закрытии `ItTicket` в UI `ItServiceViewModel.Resolve()` автоматически передаёт `documentId: SelectedTicket.Id`, поэтому любое списание из Help Desk прослеживается до конкретной заявки.
+## Roadmap
 
-## Phase 4 — Fleet / Автопарк
+В работе (открытые PR в `main`):
 
-- Модель `VehicleTrip` расширена полем `DriverName` (StringLength 128). `DocumentId` остаётся nullable на уровне БД для обратной совместимости с ранее созданными поездками, но новый API бронирования требует заполненного значения. EF6 миграция `20260423175847_AddVehicleTripDriverName` добавляет колонку.
-- `IVehicleRepository` + `InMemoryVehicleRepository` — абстракция хранилища автопарка (`ListVehicles`, `GetVehicle`, `ListTrips(vehicleId)`, `AddVehicle`, `AddTrip`).
-- `IFleetService` получает вторую перегрузку `BookVehicle(int vehicleId, int documentId, DateTime start, DateTime end, string driverName)`. Phase 1-перегрузка `BookVehicle(Vehicle, ...)` сохранена для обратной совместимости и тестов.
-- UI: `FleetView` — три секции (список ТС → расписание выбранного ТС → форма бронирования с `DatePicker`/`TextBox`/`ComboBox` документа). Кнопка «Забронировать» ловит `VehicleBookingException` и показывает пользователю понятное сообщение без закрытия формы.
-- DI: `IVehicleRepository`, `IFleetService` и `FleetViewModel` зарегистрированы в `AppServices`. `MainWindow.xaml` подключает `FleetView` вместо плейсхолдера.
-- Демо-данные (`DemoDataSeeder.SeedFleet`): Lada Largus / «ГАЗель NEXT» / «УАЗ Патриот» (последний на обслуживании) + две заявки на транспорт (`DocumentType.Fleet`), привязанные к адресам МКУ «АХУ» БМР.
-- Тесты: **+10** (`FleetServicePhase4Tests`) — успешное бронирование без пересечений; точное / частичное (слева и справа) / содержащее пересечение; стыковка интервалов [a,b) без пересечения; отсутствие ТС; ТС на обслуживании; пустые `driverName` / `documentId`. Итого **78 / 78**.
+- **Bug #2 — уведомления исчезают после «Прочитано».** `MyDesktopViewModel`
+  получает чекбокс «Только непрочитанные», `MarkRead` теперь убирает
+  уведомление из коллекции вместо тяжёлого `Reload()`, `IMessenger`
+  публикует `UnreadCountChangedMessage` для обновления бейджа в шапке.
+  PR [coappo/AhuErp#1](https://github.com/coappo/AhuErp/pull/1).
+- **Bug #3 — новая РКК не должна быть locked-by-signature.** Баннер блокировки
+  показывается только при наличии хотя бы одной `Qualified`-подписи,
+  `RkkViewModel.New()` явно создаёт `Document { IsLocked = false, Status =
+  Draft, ApprovalStatus = Draft, AccessLevel = Public }`, а
+  `SignatureService.Sign` блокирует только Qualified-подпись. PR
+  [coappo/AhuErp#2](https://github.com/coappo/AhuErp/pull/2).
+- **Bug #4 — отделение резолюций от поручений.** На вкладке «3. Поручения и
+  контроль» теперь две секции: «Резолюции руководителя» (`DocumentResolution`,
+  `RolePolicy.CanIssueResolution`) и «Поручения по документу»
+  (`DocumentTask`). При создании резолюции `ITaskService.IssueResolution`
+  пишет `AuditLog` и шлёт уведомление упомянутому через `@ФамилияИО`
+  исполнителю. PR [coappo/AhuErp#3](https://github.com/coappo/AhuErp/pull/3).
+- **Bug #5 — склад: имена вместо Id + фильтры + цвета.** В колонках
+  «Документ» и «Инициатор» отображаются нормальные строки (тип + название
+  документа, ФИО сотрудника), добавлены три фильтра (по позиции, инициатору,
+  периоду) и колонка «Тип операции» с цветовой подсветкой (приход —
+  зелёный, расход — красный). PR
+  [coappo/AhuErp#4](https://github.com/coappo/AhuErp/pull/4) (244 / 244 теста).
 
-### LINQ-логика проверки пересечений
+В планах (по приёмочному списку):
 
-Пересечение интервалов ищется по классическому Allen-алгоритму:
+- Bug #6 + Improvement #9 — RBAC-рефакторинг (явные permission-ключи вместо
+  module-ключей в `RolePolicy`).
+- Bug #7 — унификация РКК (единая 6-вкладочная карточка для всех типов
+  документов с условной видимостью полей).
+- Bug #8 + Improvement #17 — административная панель и парольная политика
+  (срок жизни пароля, история, lockout после 5 неудачных входов).
+- Improvement #10 — расширение функциональности ИТО (status-pipeline по
+  заявке, журнал ВКС, справочник `NetworkSegment`).
+- Improvement #11 — расширенные `DocumentStatus` (`Registered`, `OnApproval`,
+  `Approved`, `Rejected`, `OnSigning`, `Signed`, `OnExecution`, `Completed`,
+  `Cancelled`, `Archived`) + state machine.
+- Improvement #12 — журналы регистрации (входящие, исходящие, внутренние,
+  договоры, ГСМ, инструктажи ОТ/ПБ, инвентаризации).
+- Improvement #13 — закупки 44-ФЗ (`ProcurementPlan`, `ProcurementProcedure`,
+  `Contract`, `ContractMilestone`).
+- Improvement #14 — транспорт: путёвки и ГСМ (формы №3 / №4-С, расчёт
+  расхода, уведомления о ОСАГО / ТО).
+- Improvement #15 — эксплуатация зданий (`Building`, `Room`, `MaintenanceRequest`,
+  `Inventarization`, `FixedAsset`).
+- Improvement #16 — архив: внутренний workflow «передача дела в архив»,
+  сроки хранения, акты уничтожения.
+- Improvement #18 — DevEx: GitHub Actions CI, `Coverlet`-покрытие, `Serilog`,
+  локализация в `.resx`.
 
-```csharp
-existingTrips.Any(t => t.VehicleId == vehicleId
-                       && t.StartDate < endDate
-                       && t.EndDate   > startDate);
-```
+---
 
-Эквивалентный инвариант: «две встречи пересекаются ⇔ каждая начинается раньше конца другой». Если любое существующее бронирование удовлетворяет ему — `FleetService` выбрасывает `VehicleBookingException`. Пограничный случай `existing.EndDate == newStart` считается стыковкой (не пересечением): интервалы трактуются как полуоткрытые `[start, end)`, поэтому «спина-к-спине» бронирование разрешено.
+## Авторство
 
-Вычисление инкапсулировано в `VehicleTrip.OverlapsWith(start, end)` и переиспользуется из обеих перегрузок `FleetService.BookVehicle`.
+Заказчик — **МКУ «АХУ» БМР** (муниципальное казённое учреждение
+административно-хозяйственного управления Балаковского муниципального
+района). Профильная деятельность: МТО органов МСУ, транспорт, эксплуатация
+зданий, архив, делопроизводство, ИТ-сопровождение.
 
-## Phase 5 — Dashboard-аналитика и экспорт отчётов
-
-- **NuGet**: `ClosedXML 0.102.3` + `DocumentFormat.OpenXml 2.20.0` (в `AhuErp.Core`) и `LiveCharts.Wpf 0.9.7` (в `AhuErp.UI`). Все три пакета совместимы с `net48` и не требуют установленного MS Office.
-- **`IReportService`** (`AhuErp.Core`):
-  - `ExportInventoryToExcel(filePath)` — ClosedXML, лист «Склад ТМЦ», отформатированная шапка (bold + фон LightSteelBlue + нижняя граница), колонки `№ / Наименование / Категория / Остаток`, `Columns().AdjustToContents()`.
-  - `GenerateArchiveCertificate(archiveRequestId, filePath)` — DOCX через `WordprocessingDocument` + `DocumentFormat.OpenXml.Wordprocessing`. Заголовок «АРХИВНАЯ СПРАВКА», реквизиты архивного отдела, подстановка `№`, даты создания, вида запроса, темы, срока, статусов сканов паспорта/трудовой и выбор одного из двух формальных абзацев (полный пакет / требуется досбор).
-- **UI**:
-  - `WarehouseViewModel.ExportToExcelCommand` — `IFileDialogService.PromptSaveFile(...)` → `IReportService.ExportInventoryToExcel`. Отдельно обрабатываются `IOException` (файл занят), `UnauthorizedAccessException` и прочие `Exception`.
-  - `ArchiveViewModel.GenerateCertificateCommand` — аналогичный flow для Word-справки, активна только при выбранной заявке.
-  - `IFileDialogService` / `FileDialogService` — тонкая обёртка над `Microsoft.Win32.SaveFileDialog`, чтобы ViewModel оставался не зависящим от WPF-диалогов.
-- **Дашборд** (`DashboardViewModel` + `DashboardView.xaml`):
-  - KPI-карточки: просроченные архивные заявки, ТС в рейсе сейчас, ТМЦ с остатком < 5, всего просроченных документов, с дедлайном ≤ 3 дней.
-  - `lvc:PieChart` — распределение документов по `DocumentStatus`. `lvc:CartesianChart` с `ColumnSeries` — сумма остатков ТМЦ по категориям.
-  - Данные собираются в `Task.Run(...)` → `ConfigureAwait(true)`, UI-поток не блокируется. Повторная загрузка доступна через `RefreshCommand`. `IsLoading` гасит кнопку и показывает индикатор «Загрузка…».
-- **DI** (`AppServices.ConfigureServices`): `IReportService → ReportService` (singleton) и `IFileDialogService → FileDialogService` добавлены рядом с другими сервисами; `DashboardViewModel` уже был зарегистрирован и отображается первым пунктом навигации — значит, для ролей `Admin` и `Manager` он автоматически открывается при входе (см. конструктор `MainViewModel`, выбор первого `IsAllowed` элемента).
-- **Тесты**: `ReportServiceTests` — `+4` теста (XLSX-шапка и строки, DOCX с полным пакетом сканов, DOCX-follow-up при отсутствии сканов, ошибка при отсутствующей заявке). XLSX открывается обратно через ClosedXML, DOCX — через `System.IO.Packaging` + `word/document.xml`, без MS Office. Итого **82 / 82** зелёных.
-
-### LiveCharts DataContext-биндинги
-
-`PieChart.Series` и `CartesianChart.Series` биндятся к `SeriesCollection`-свойствам `DocumentStatusSeries` и `InventoryByCategorySeries` в `DashboardViewModel`. `CartesianChart.AxisX.Labels` биндится к `string[] InventoryCategoryLabels`. `DashboardViewModel` наследует `ViewModelBase : ObservableObject` (CommunityToolkit.Mvvm), поэтому `[ObservableProperty]` генерирует `INotifyPropertyChanged`-уведомления, и LiveCharts перестраивает диаграммы при каждом `RefreshAsync()`. Важно: `SeriesCollection` собирается в фоновом `Task.Run`, но применяется к VM в UI-потоке через `await ... .ConfigureAwait(true)` — LiveCharts поддерживает только UI-поточное обновление.
-
-## Roadmap (будущие итерации)
-
-- Аудит-лог и отчётность (кто/что/когда), а также полная миграция in-memory репозиториев на реальный `AhuDbContext`/EF6 (сейчас DI-слой готов к подмене без изменений ViewModel).
+Подразделения: Отдел делопроизводства, Отдел хозяйственного обслуживания,
+Отдел по информационно-техническому обеспечению (ИТО), Общий отдел,
+Архивный отдел, Отдел учёта/отчётности/кадров, Заместитель руководителя,
+Руководитель.

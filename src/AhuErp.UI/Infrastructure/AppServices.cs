@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using AhuErp.Core.Data;
 using AhuErp.Core.Services;
 using AhuErp.UI.ViewModels;
+using CommunityToolkit.Mvvm.Messaging;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace AhuErp.UI.Infrastructure
@@ -138,6 +139,11 @@ namespace AhuErp.UI.Infrastructure
             services.AddSingleton<IFileDialogService, FileDialogService>();
             services.AddSingleton<DocumentNavigator>();
             services.AddSingleton<IDocumentNavigator>(sp => sp.GetRequiredService<DocumentNavigator>());
+
+            // Bug #2 — кросс-VM шина сообщений (MyDesktop → Main для бейджа
+            // непрочитанных уведомлений). WeakReferenceMessenger.Default —
+            // потокобезопасный singleton от CommunityToolkit.Mvvm.
+            services.AddSingleton<IMessenger>(WeakReferenceMessenger.Default);
 
             // ViewModels — transient, чтобы получать свежее состояние при навигации.
             services.AddTransient<LoginViewModel>();

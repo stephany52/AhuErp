@@ -27,6 +27,7 @@ namespace AhuErp.UI.Converters
             [DocumentStatus.OnHold] = "Приостановлен",
             [DocumentStatus.Completed] = "Завершён",
             [DocumentStatus.Cancelled] = "Отменён",
+            [DocumentStatus.Registered] = "Зарегистрирован",
 
             [DocumentType.General] = "Общий",
             [DocumentType.Office] = "Документационное обеспечение",
@@ -116,6 +117,10 @@ namespace AhuErp.UI.Converters
             [EmployeeRole.Archivist] = "Сотрудник архивного отдела",
             [EmployeeRole.TechSupport] = "Специалист ИТО",
             [EmployeeRole.WarehouseManager] = "Ответственный за ТМЦ",
+            [EmployeeRole.Clerk] = "Делопроизводитель",
+            [EmployeeRole.HRAdmin] = "Сотрудник отдела учёта/кадров",
+            [EmployeeRole.DeputyHead] = "Заместитель руководителя",
+            [EmployeeRole.FleetManager] = "Ответственный за автопарк",
 
             [AuditActionType.Created] = "Создание",
             [AuditActionType.Updated] = "Изменение",
@@ -142,6 +147,7 @@ namespace AhuErp.UI.Converters
             [AuditActionType.SignatureAdded] = "Подписание",
             [AuditActionType.SignatureRevoked] = "Отзыв подписи",
             [AuditActionType.DocumentLocked] = "Документ заблокирован КЭП",
+            [AuditActionType.DocumentUnlocked] = "Документ разблокирован",
             [AuditActionType.NotificationSent] = "Уведомление отправлено",
             [AuditActionType.SubstitutionCreated] = "Замещение создано",
             [AuditActionType.SubstitutionCancelled] = "Замещение отменено",

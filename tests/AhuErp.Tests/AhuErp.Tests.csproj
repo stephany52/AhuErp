@@ -20,6 +20,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\AhuErp.Core\AhuErp.Core.csproj" />
+    <!-- Bug #2/#3/#5: тестам на VM-ы (MyDesktopViewModel, RkkViewModel,
+         WarehouseViewModel) и IValueConverter нужен доступ к AhuErp.UI.
+         Сам UI — WinExe + WPF; в xunit WPF-окна не запускаются, но загрузка
+         типов VM-ов / converters достаточна для unit-тестов. -->
+    <ProjectReference Include="..\..\src\AhuErp.UI\AhuErp.UI.csproj" />
   </ItemGroup>
 
 </Project>

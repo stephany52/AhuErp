@@ -47,6 +47,9 @@ namespace AhuErp.UI.ViewModels
         public ObservableCollection<DocumentTask> Tasks { get; }
             = new ObservableCollection<DocumentTask>();
 
+        public ObservableCollection<DocumentResolution> Resolutions { get; }
+            = new ObservableCollection<DocumentResolution>();
+
         public ObservableCollection<DocumentApproval> Approvals { get; }
             = new ObservableCollection<DocumentApproval>();
 
@@ -159,14 +162,32 @@ namespace AhuErp.UI.ViewModels
         [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
         [NotifyCanExecuteChangedFor(nameof(RegisterCommand))]
         [NotifyCanExecuteChangedFor(nameof(AddTaskCommand))]
+        [NotifyCanExecuteChangedFor(nameof(AddResolutionCommand))]
         [NotifyCanExecuteChangedFor(nameof(CreateInventoryWriteOffCommand))]
         [NotifyCanExecuteChangedFor(nameof(CreateVehicleTripCommand))]
         [NotifyCanExecuteChangedFor(nameof(CreateArchiveRequestCommand))]
         [NotifyCanExecuteChangedFor(nameof(CreateItTicketCommand))]
         [NotifyCanExecuteChangedFor(nameof(SignSimpleCommand))]
         [NotifyCanExecuteChangedFor(nameof(SignQualifiedCommand))]
+        [NotifyCanExecuteChangedFor(nameof(UnlockDocumentCommand))]
         [NotifyPropertyChangedFor(nameof(RegistrationNumberDisplay))]
+        [NotifyPropertyChangedFor(nameof(IsDocumentLocked))]
         private Document selectedDocument;
+
+        /// <summary>
+        /// Bug #3 — баннер «Документ заблокирован КЭП» должен зажигаться
+        /// только когда оба условия выполнены: <see cref="Document.IsLocked"/>
+        /// = true И в <see cref="Signatures"/> есть хотя бы одна активная
+        /// (не отозванная) квалифицированная подпись. Раньше баннер
+        /// привязывался напрямую к <c>SelectedDocument.IsLocked</c>, и
+        /// при нажатии «Новый» (когда SelectedDocument=null) WPF-биндинг
+        /// падал в недетерминированное поведение, из-за чего пустая
+        /// карточка выглядела заблокированной.
+        /// </summary>
+        public bool IsDocumentLocked =>
+            SelectedDocument != null
+            && SelectedDocument.IsLocked
+            && Signatures.Any(s => !s.IsRevoked && s.Kind == SignatureKind.Qualified);
 
         public string RegistrationNumberDisplay
         {
@@ -207,6 +228,13 @@ namespace AhuErp.UI.ViewModels
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(AddTaskCommand))]
         private string newTaskDescription;
+
+        // Bug #4 — отдельное поле под текст резолюции (см. вкладку
+        // «3. Поручения и контроль» — секция «Резолюции руководителя»).
+        // Кнопка «Наложить резолюцию» доступна только Manager/Admin.
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(AddResolutionCommand))]
+        private string newResolutionText;
 
         [ObservableProperty]
         private DateTime newTaskDeadline = DateTime.Today.AddDays(3);
@@ -269,6 +297,7 @@ namespace AhuErp.UI.ViewModels
             SelectedCase = NomenclatureCases.FirstOrDefault(c => c.Id == value.NomenclatureCaseId);
             ReloadAttachments();
             ReloadTasks();
+            ReloadResolutions();
             ReloadApprovals();
             ReloadHistory();
             ReloadRelatedOps();
@@ -310,12 +339,43 @@ namespace AhuErp.UI.ViewModels
             }
         }
 
+        /// <summary>
+        /// Bug #3 — кнопка «Новый» в РКК. Раньше команда только сбрасывала
+        /// <see cref="SelectedDocument"/> и драфт-поля, из-за чего баннер
+        /// «Документ заблокирован КЭП» иногда оказывался виден на пустой
+        /// карточке (срабатывание WPF-биндинга на null). Теперь явно строим
+        /// in-memory шаблон документа со статусом <see cref="DocumentStatus.New"/>
+        /// («Черновик» в текущем перечислении статусов),
+        /// <see cref="ApprovalRouteStatus.Draft"/>, публичным грифом и
+        /// <c>IsLocked = false</c>. Документ при этом ещё не сохраняется в БД —
+        /// сохранение происходит из <see cref="Save"/>, который читает драфт-поля.
+        /// </summary>
         [RelayCommand]
         private void New()
         {
             SelectedDocument = null;
             ClearDraft();
+            // Явный шаблон-черновик. Используется тестами как контракт «новый
+            // документ всегда разблокирован, в статусе New, с публичным грифом».
+            DraftDocumentTemplate = new Document
+            {
+                IsLocked = false,
+                Status = DocumentStatus.New,
+                ApprovalStatus = ApprovalRouteStatus.Draft,
+                AccessLevel = DocumentAccessLevel.Public,
+                CreationDate = DateTime.Now,
+            };
+            SelectedAccessLevel = DocumentAccessLevel.Public;
+            SelectedDirection = DocumentDirection.Internal;
         }
+
+        /// <summary>
+        /// Bug #3 — последний шаблон, созданный <see cref="New"/>. Используется
+        /// тестами для проверки контракта «новая РКК всегда стартует Draft и
+        /// разблокированной». В UI напрямую не биндится: реальный документ
+        /// материализуется при первом <see cref="Save"/>.
+        /// </summary>
+        public Document DraftDocumentTemplate { get; private set; }
 
         [RelayCommand(CanExecute = nameof(CanSave))]
         private void Save()
@@ -343,6 +403,7 @@ namespace AhuErp.UI.ViewModels
                     _documents.Add(doc);
                     _audit.Record(AuditActionType.Created, nameof(Document), doc.Id,
                         _auth.CurrentEmployee?.Id, newValues: $"Title={doc.Title}");
+                    AutoRegisterOnSaveIfNeeded(doc);
                     Reload();
                     SelectedDocument = Documents.FirstOrDefault(d => d.Id == doc.Id);
                 }
@@ -360,7 +421,16 @@ namespace AhuErp.UI.ViewModels
                     _documents.Update(doc);
                     _audit.Record(AuditActionType.Updated, nameof(Document), doc.Id,
                         _auth.CurrentEmployee?.Id, newValues: $"Title={doc.Title}");
-                    ReloadHistory();
+                    if (AutoRegisterOnSaveIfNeeded(doc))
+                    {
+                        var docId = doc.Id;
+                        Reload();
+                        SelectedDocument = Documents.FirstOrDefault(d => d.Id == docId);
+                    }
+                    else
+                    {
+                        ReloadHistory();
+                    }
                 }
             }
             catch (Exception ex)
@@ -383,6 +453,37 @@ namespace AhuErp.UI.ViewModels
                 SelectedDocument = Documents.FirstOrDefault(d => d.Id == docId);
             }
             catch (Exception ex) { ErrorMessage = ex.Message; }
+        }
+
+        // Bug #4. «Наложить резолюцию» — отдельная команда для руководителя.
+        // Не требует исполнителя/срока в UI: исполнитель упоминается в тексте
+        // самой резолюции по формату «@ФамилияИО», и сервис создаст ему
+        // in-app/e-mail уведомление. Конкретные поручения с дедлайнами
+        // создаются отдельно командой AddTask.
+        [RelayCommand(CanExecute = nameof(CanIssueResolution))]
+        private void AddResolution()
+        {
+            ErrorMessage = null;
+            try
+            {
+                var actor = _auth.CurrentEmployee?.Id ?? 0;
+                if (actor == 0) { ErrorMessage = "Не определён текущий сотрудник."; return; }
+
+                _tasksService.AddResolution(SelectedDocument.Id, actor, NewResolutionText);
+                NewResolutionText = null;
+                ReloadResolutions();
+                ReloadHistory();
+            }
+            catch (Exception ex) { ErrorMessage = ex.Message; }
+        }
+
+        private bool CanIssueResolution()
+        {
+            var role = _auth?.CurrentEmployee?.Role;
+            return SelectedDocument != null
+                   && !string.IsNullOrWhiteSpace(NewResolutionText)
+                   && role.HasValue
+                   && RolePolicy.CanIssueResolution(role.Value);
         }
 
         [RelayCommand(CanExecute = nameof(CanAddTask))]
@@ -521,6 +622,15 @@ namespace AhuErp.UI.ViewModels
             catch (Exception ex) { ErrorMessage = ex.Message; }
         }
 
+        private bool AutoRegisterOnSaveIfNeeded(Document doc)
+        {
+            if (!RolePolicy.AutoRegisterOnSave || doc == null || doc.IsRegistered || doc.IsLocked || !doc.DocumentTypeRefId.HasValue)
+                return false;
+
+            _nomenclature.Register(doc.Id, SelectedCase?.Id ?? doc.NomenclatureCaseId);
+            return true;
+        }
+
         private bool HasSelectedDocument() => SelectedDocument != null;
 
         private bool CanWriteOff() =>
@@ -574,6 +684,14 @@ namespace AhuErp.UI.ViewModels
             foreach (var t in _tasksService.ListByDocument(SelectedDocument.Id)) Tasks.Add(t);
         }
 
+        private void ReloadResolutions()
+        {
+            Resolutions.Clear();
+            if (SelectedDocument == null) return;
+            foreach (var r in _tasksService.ListResolutionsByDocument(SelectedDocument.Id))
+                Resolutions.Add(r);
+        }
+
         private void ReloadApprovals()
         {
             Approvals.Clear();
@@ -606,6 +724,7 @@ namespace AhuErp.UI.ViewModels
             SelectedCase = null;
             Attachments.Clear();
             Tasks.Clear();
+            Resolutions.Clear();
             Approvals.Clear();
             History.Clear();
             Signatures.Clear();
@@ -616,9 +735,18 @@ namespace AhuErp.UI.ViewModels
         private void ReloadSignatures()
         {
             Signatures.Clear();
-            if (SelectedDocument == null || _signatures == null) return;
+            if (SelectedDocument == null || _signatures == null)
+            {
+                OnPropertyChanged(nameof(IsDocumentLocked));
+                UnlockDocumentCommand.NotifyCanExecuteChanged();
+                return;
+            }
             foreach (var s in _signatures.ListByDocument(SelectedDocument.Id))
                 Signatures.Add(s);
+            // Bug #3: лок-баннер зависит и от состава Signatures, и от
+            // SelectedDocument.IsLocked — пересчитываем после обновления списка.
+            OnPropertyChanged(nameof(IsDocumentLocked));
+            UnlockDocumentCommand.NotifyCanExecuteChanged();
         }
 
         [RelayCommand(CanExecute = nameof(CanSign))]
@@ -680,11 +808,61 @@ namespace AhuErp.UI.ViewModels
             catch (Exception ex) { ErrorMessage = ex.Message; }
         }
 
+        /// <summary>
+        /// Bug #3 — снимает программную блокировку с документа (выставленную
+        /// первой Qualified-подписью). Доступно только Admin/Manager:
+        /// вынуждает разблокировать карточку даже если активная Qualified-
+        /// подпись осталась в журнале — фактическое подписание не отменяется,
+        /// просто разрешается редактировать «иммутабельные» поля. Каждое
+        /// нажатие пишет запись в <see cref="AuditActionType.DocumentUnlocked"/>.
+        /// </summary>
+        [RelayCommand(CanExecute = nameof(CanUnlockDocument))]
+        private void UnlockDocument()
+        {
+            ErrorMessage = null;
+            try
+            {
+                var actor = _auth.CurrentEmployee?.Id ?? 0;
+                if (actor == 0) { ErrorMessage = "Не определён текущий сотрудник."; return; }
+                var doc = SelectedDocument;
+                if (doc == null || !doc.IsLocked) return;
+
+                doc.IsLocked = false;
+                _documents.Update(doc);
+                _audit.Record(AuditActionType.DocumentUnlocked, nameof(Document), doc.Id, actor,
+                    newValues: "IsLocked=false", details: SignReason ?? "Снятие блокировки из РКК");
+                SignReason = null;
+
+                // Обновляем выбранный документ — поднимет PropertyChanged для всех
+                // зависимых биндингов (баннер, IsReadOnly у Title/Correspondent/Summary).
+                // InMemoryDocumentRepository.GetById() возвращает ту же ссылку, что
+                // лежит в SelectedDocument, поэтому SetProperty не зафиксирует
+                // изменения и WPF не перевычислит {Binding SelectedDocument.IsLocked}.
+                // Сначала сбрасываем в null, затем переустанавливаем — это вынудит
+                // WPF переподписаться на свойства документа и перерисовать поля.
+                var refreshed = _documents.GetById(doc.Id);
+                SelectedDocument = null;
+                if (refreshed != null) SelectedDocument = refreshed;
+                OnPropertyChanged(nameof(IsDocumentLocked));
+                ReloadHistory();
+            }
+            catch (Exception ex) { ErrorMessage = ex.Message; }
+        }
+
         private bool CanSign() => SelectedDocument != null && _signatures != null;
         private bool CanSignQualified() => CanSign()
             && !string.IsNullOrWhiteSpace(SignCertificateThumbprint);
         private bool CanRevokeSignature() => SelectedSignature != null
             && !SelectedSignature.IsRevoked && _signatures != null;
+
+        private bool CanUnlockDocument()
+        {
+            var role = _auth?.CurrentEmployee?.Role;
+            return SelectedDocument != null
+                   && SelectedDocument.IsLocked
+                   && role.HasValue
+                   && (role.Value == EmployeeRole.Admin || role.Value == EmployeeRole.Manager);
+        }
 
         private bool CanSave() => !string.IsNullOrWhiteSpace(DraftTitle);
         private bool CanRegister() => SelectedDocument != null && !SelectedDocument.IsRegistered;

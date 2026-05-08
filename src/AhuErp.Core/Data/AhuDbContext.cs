@@ -1,5 +1,6 @@
 using System.Data.Entity;
 using System.Data.Entity.ModelConfiguration.Conventions;
+using System.Linq;
 using AhuErp.Core.Models;
 
 namespace AhuErp.Core.Data
@@ -45,6 +46,7 @@ namespace AhuErp.Core.Data
 
         public virtual DbSet<DocumentTypeRef> DocumentTypeRefs { get; set; }
         public virtual DbSet<NomenclatureCase> NomenclatureCases { get; set; }
+        public virtual DbSet<NomenclatureCounter> NomenclatureCounters { get; set; }
         public virtual DbSet<DocumentCaseLink> DocumentCaseLinks { get; set; }
         public virtual DbSet<DocumentAttachment> DocumentAttachments { get; set; }
         public virtual DbSet<DocumentResolution> DocumentResolutions { get; set; }
@@ -64,6 +66,33 @@ namespace AhuErp.Core.Data
         // Phase 9 — уведомления и пользовательские предпочтения.
         public virtual DbSet<Notification> Notifications { get; set; }
         public virtual DbSet<NotificationPreference> NotificationPreferences { get; set; }
+
+        public override int SaveChanges()
+        {
+            ValidateDocumentRegistrationNumbers();
+            return base.SaveChanges();
+        }
+
+        public override System.Threading.Tasks.Task<int> SaveChangesAsync()
+        {
+            ValidateDocumentRegistrationNumbers();
+            return base.SaveChangesAsync();
+        }
+
+        public override System.Threading.Tasks.Task<int> SaveChangesAsync(System.Threading.CancellationToken cancellationToken)
+        {
+            ValidateDocumentRegistrationNumbers();
+            return base.SaveChangesAsync(cancellationToken);
+        }
+
+        private void ValidateDocumentRegistrationNumbers()
+        {
+            foreach (var entry in ChangeTracker.Entries<Document>()
+                         .Where(e => e.State == EntityState.Added || e.State == EntityState.Modified))
+            {
+                Document.ValidateRegistrationNumber(entry.Entity.RegistrationNumber);
+            }
+        }
 
         protected override void OnModelCreating(DbModelBuilder modelBuilder)
         {
@@ -174,6 +203,13 @@ namespace AhuErp.Core.Data
             modelBuilder.Entity<DocumentTypeRef>().ToTable("DocumentTypeRefs");
 
             modelBuilder.Entity<NomenclatureCase>().ToTable("NomenclatureCases");
+
+            modelBuilder.Entity<NomenclatureCounter>().ToTable("NomenclatureCounters");
+            modelBuilder.Entity<NomenclatureCounter>()
+                .Property(c => c.TypeCode)
+                .IsRequired()
+                .HasMaxLength(16);
+
             modelBuilder.Entity<NomenclatureCase>()
                 .HasOptional(n => n.Department)
                 .WithMany(d => d.NomenclatureCases)
