@@ -139,6 +139,17 @@ namespace AhuErp.Core.Services
             if (approval.Decision != ApprovalDecision.Pending)
                 throw new InvalidOperationException("По этому этапу уже принято решение.");
 
+            // Bug #6: авторизация на уровне согласования — это владелец этапа
+            // (ApproverId, который сам уже резолвлен через активное замещение
+            // на момент StartApproval) ИЛИ сотрудник, для которого активно
+            // замещение того, кто исходно владеет этапом. Никаких проверок по
+            // EmployeeRole — иначе TechSupport/любая роль не сможет согласовать
+            // свой собственный этап.
+            if (!IsAuthorizedActor(approval, actorId))
+                throw new UnauthorizedAccessException(
+                    $"Сотрудник #{actorId} не является согласующим этапа #{approval.Id} " +
+                    "и не имеет активного замещения на эту область.");
+
             approval.Decision = decision;
             approval.Comment = comment;
             approval.DecisionDate = DateTime.UtcNow;
@@ -201,5 +212,21 @@ namespace AhuErp.Core.Services
 
         public IReadOnlyList<DocumentApproval> ListForApprover(int approverId, ApprovalDecision? decision = null)
             => _repository.ListApprovalsByApprover(approverId, decision);
+
+        /// <summary>
+        /// True, если <paramref name="actorId"/> может принять решение по
+        /// этапу <paramref name="approval"/>: либо это сам согласующий, либо
+        /// его активный заместитель (область ApprovalsOnly или Full).
+        /// </summary>
+        private bool IsAuthorizedActor(DocumentApproval approval, int actorId)
+        {
+            if (actorId <= 0) return false;
+            if (approval.ApproverId == actorId) return true;
+            if (_substitution == null) return false;
+
+            var sub = _substitution.GetActiveSubstitute(
+                approval.ApproverId, DateTime.Now, SubstitutionScope.ApprovalsOnly);
+            return sub?.SubstituteEmployeeId == actorId;
+        }
     }
 }
