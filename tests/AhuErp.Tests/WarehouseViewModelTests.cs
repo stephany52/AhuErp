@@ -246,6 +246,49 @@ namespace AhuErp.Tests
         }
 
         [Fact]
+        public void Reload_does_not_recurse_when_InitiatorOptions_rebuild_nulls_FilterInitiator()
+        {
+            // Bug #5 (review). Регрессия: в проде WPF ComboBox с TwoWay-биндингом
+            // на InitiatorOptions.Clear() сбрасывает SelectedItem в null и
+            // пишет null обратно в FilterInitiator (UpdateSourceTrigger=
+            // PropertyChanged). Без _suppressFilterReload вокруг блока
+            // пересборки списка и переустановки FilterInitiator это срывалось
+            // в рекурсивный Reload() → StackOverflowException.
+            //
+            // В xunit на Linux WPF-биндингов нет, поэтому эмулируем поведение
+            // ComboBox: подписываемся на InitiatorOptions.CollectionChanged
+            // и на Reset/Remove зануляем FilterInitiator. Если флаг не работает,
+            // тест уйдёт в рекурсивный Reload и упадёт с StackOverflow.
+            _inventoryService.ProcessTransaction(_paper.Id, 5, null, _supply.Id);
+            _inventoryService.ProcessTransaction(_toner.Id, -1, _orderForToner.Id, _ito.Id);
+
+            var vm = CreateVm();
+            vm.FilterInitiator = vm.InitiatorOptions.Single(e => e.Id == _ito.Id);
+
+            vm.InitiatorOptions.CollectionChanged += (_, e) =>
+            {
+                if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Reset
+                    || e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Remove)
+                {
+                    vm.FilterInitiator = null;
+                }
+            };
+
+            // RefreshCommand → Reload(). Без фикса — StackOverflowException
+            // (или зависание). С фиксом — отрабатывает без рекурсии.
+            vm.RefreshCommand.Execute(null);
+
+            // После Reload восстановили оригинальный фильтр (Id == _ito.Id);
+            // тестовый сценарий не успевает «запомнить» null, потому что
+            // suppress-флаг съедает событие, и в конце Reload FilterInitiator
+            // снова равен сотруднику ИТО.
+            Assert.NotNull(vm.FilterInitiator);
+            Assert.Equal(_ito.Id, vm.FilterInitiator.Id);
+            Assert.Single(vm.RecentTransactions);
+            Assert.Equal(_ito.Id, vm.RecentTransactions[0].InitiatorId);
+        }
+
+        [Fact]
         public void ClearFiltersCommand_resets_all_filters_and_repopulates_full_journal()
         {
             _inventoryService.ProcessTransaction(_paper.Id, 5, null, _supply.Id);

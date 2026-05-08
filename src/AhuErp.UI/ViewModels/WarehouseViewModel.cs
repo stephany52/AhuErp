@@ -306,11 +306,28 @@ namespace AhuErp.UI.ViewModels
                 .OrderBy(e => e.FullName)
                 .ToList();
 
-            InitiatorOptions.Clear();
-            foreach (var emp in distinctInitiators)
-                InitiatorOptions.Add(emp);
+            // Bug #5 (review). Подавляем Reload() пока пересобираем
+            // InitiatorOptions и переустанавливаем FilterInitiator: WPF
+            // ComboBox с TwoWay-биндингом на InitiatorOptions.Clear()
+            // принудительно сбрасывает SelectedItem в null и через
+            // UpdateSourceTrigger=PropertyChanged пишет это обратно в
+            // FilterInitiator. Без флага OnFilterInitiatorChanged срывался
+            // в Reload(), который снова дёргал ту же логику — вплоть до
+            // StackOverflowException в продакшене (в xunit-тестах WPF-
+            // биндингов нет, поэтому unit-тесты этого не ловили).
+            _suppressFilterReload = true;
+            try
+            {
+                InitiatorOptions.Clear();
+                foreach (var emp in distinctInitiators)
+                    InitiatorOptions.Add(emp);
 
-            FilterInitiator = InitiatorOptions.FirstOrDefault(e => e.Id == initiatorId);
+                FilterInitiator = InitiatorOptions.FirstOrDefault(e => e.Id == initiatorId);
+            }
+            finally
+            {
+                _suppressFilterReload = false;
+            }
 
             IEnumerable<InventoryTransaction> filtered = allTransactions;
             if (FilterFrom.HasValue)
