@@ -75,6 +75,7 @@ namespace AhuErp.UI.Converters
             [DocumentTypeFacet.Incoming] = "Входящие",
             [DocumentTypeFacet.Outgoing] = "Исходящие",
             [DocumentTypeFacet.Internal] = "Внутренние",
+            [DocumentTypeFacet.OfficeDocuments] = "Документационное обеспечение",
             [DocumentTypeFacet.Contracts] = "Договоры",
             [DocumentTypeFacet.ServiceMemos] = "Служебные записки",
             [DocumentTypeFacet.ItTickets] = "IT-заявки",
