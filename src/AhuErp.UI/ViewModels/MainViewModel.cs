@@ -80,20 +80,31 @@ namespace AhuErp.UI.ViewModels
             (messenger ?? WeakReferenceMessenger.Default).Register<MainViewModel, UnreadCountChangedMessage>(
                 this, static (recipient, msg) => recipient.UnreadNotifications = msg.Value);
 
+            // Bug #7. «Документационное обеспечение», «Мои задачи», «Архивный
+            // отдел», «ИТО», «Журналы регистрации», «Поиск» теперь не открывают
+            // отдельные ViewModel'и, а переключают единственный экран РКК на
+            // соответствующий пресет фильтров. Старые VM-ы остаются в DI-контейнере
+            // (officeVm/myTasksVm/archiveVm/itServiceVm/journalVm/searchVm) для
+            // обратной совместимости и исторических зависимостей (например,
+            // DashboardViewModel читает оттуда KPI), но в навигации они
+            // больше не используются.
+            _ = officeVm; _ = myTasksVm; _ = archiveVm;
+            _ = itServiceVm; _ = journalVm; _ = searchVm;
+
             NavigationItems = new ObservableCollection<NavigationItem>
             {
                 new NavigationItem("Мой рабочий стол", RolePolicy.MyDesktop, myDesktopVm),
                 new NavigationItem("Дашборд",    RolePolicy.Dashboard, dashboardVm),
-                new NavigationItem("РКК (документы)", RolePolicy.Office, rkkVm),
-                new NavigationItem("Документационное обеспечение", RolePolicy.Office,    officeVm),
-                new NavigationItem("Мои задачи",  RolePolicy.MyTasks,   myTasksVm),
-                new NavigationItem("Архивный отдел", RolePolicy.Archive, archiveVm),
+                new NavigationItem("РКК (документы)", RolePolicy.Office, rkkVm, RkkPreset.All),
+                new NavigationItem("Документационное обеспечение", RolePolicy.Office, rkkVm, RkkPreset.OfficeDocuments),
+                new NavigationItem("Мои задачи",  RolePolicy.MyTasks,   rkkVm, RkkPreset.MyTasks),
+                new NavigationItem("Архивный отдел", RolePolicy.Archive, rkkVm, RkkPreset.Archive),
                 new NavigationItem("Склад / ТМЦ", RolePolicy.Warehouse, warehouseVm),
-                new NavigationItem("ИТО",        RolePolicy.ItService, itServiceVm),
+                new NavigationItem("ИТО",        RolePolicy.ItService, rkkVm, RkkPreset.ItService),
                 new NavigationItem("Транспорт",  RolePolicy.Fleet,     fleetVm),
                 new NavigationItem("Номенклатура дел", RolePolicy.Nomenclature, nomenclatureVm),
-                new NavigationItem("Журналы регистрации", RolePolicy.Journals, journalVm),
-                new NavigationItem("Поиск", RolePolicy.Search, searchVm),
+                new NavigationItem("Журналы регистрации", RolePolicy.Journals, rkkVm, RkkPreset.Journals),
+                new NavigationItem("Поиск", RolePolicy.Search, rkkVm, RkkPreset.Search),
                 new NavigationItem("Отчёты", RolePolicy.Reports, reportsVm),
                 new NavigationItem("Оргструктура", RolePolicy.OrgStructure, orgStructureVm),
                 new NavigationItem("Замещения", RolePolicy.Substitutions, substitutionsVm),
@@ -117,6 +128,15 @@ namespace AhuErp.UI.ViewModels
         partial void OnSelectedNavigationItemChanged(NavigationItem value)
         {
             CurrentViewModel = value?.ViewModel;
+
+            // Bug #7. Если пункт меню привязан к пресету РКК (например,
+            // «Мои задачи» / «Архивный отдел» / «ИТО» / «Журналы регистрации» /
+            // «Поиск») — переключаем фильтр уже открытого RkkViewModel.
+            // Открывать новые экраны не нужно: ViewModel один и тот же.
+            if (value?.Preset.HasValue == true && value.ViewModel is RkkViewModel rkk)
+            {
+                rkk.ApplyPreset(value.Preset.Value);
+            }
         }
 
         [RelayCommand]
