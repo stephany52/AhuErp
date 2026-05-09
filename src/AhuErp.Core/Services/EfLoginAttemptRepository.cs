@@ -8,50 +8,45 @@ using AhuErp.Core.Models;
 namespace AhuErp.Core.Services
 {
     /// <summary>
-    /// EF6 реализация <see cref="ILoginAttemptRepository"/>.
+    /// EF6 реализация <see cref="ILoginAttemptRepository"/>. Использует
+    /// единый singleton-контекст <see cref="AhuDbContext"/>, как и остальные
+    /// EF-репозитории проекта (см. <see cref="EfEmployeeRepository"/>) —
+    /// MS DI не резолвит <c>Func&lt;T&gt;</c> автоматически, а контекст
+    /// уже зарегистрирован как singleton с UI-потоковым доступом.
     /// </summary>
     public sealed class EfLoginAttemptRepository : ILoginAttemptRepository
     {
-        private readonly Func<AhuDbContext> _contextFactory;
+        private readonly AhuDbContext _ctx;
 
-        public EfLoginAttemptRepository(Func<AhuDbContext> contextFactory)
+        public EfLoginAttemptRepository(AhuDbContext ctx)
         {
-            _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
+            _ctx = ctx ?? throw new ArgumentNullException(nameof(ctx));
         }
 
         public LoginAttempt Add(LoginAttempt attempt)
         {
             if (attempt == null) throw new ArgumentNullException(nameof(attempt));
-            using (var ctx = _contextFactory())
-            {
-                ctx.LoginAttempts.Add(attempt);
-                ctx.SaveChanges();
-                return attempt;
-            }
+            _ctx.LoginAttempts.Add(attempt);
+            _ctx.SaveChanges();
+            return attempt;
         }
 
         public int CountRecentFailures(int employeeId, DateTime fromUtc)
         {
-            using (var ctx = _contextFactory())
-            {
-                return ctx.LoginAttempts.AsNoTracking()
-                    .Count(a => a.EmployeeId == employeeId
-                                && !a.Success
-                                && a.Timestamp >= fromUtc);
-            }
+            return _ctx.LoginAttempts.AsNoTracking()
+                .Count(a => a.EmployeeId == employeeId
+                            && !a.Success
+                            && a.Timestamp >= fromUtc);
         }
 
         public IReadOnlyList<LoginAttempt> Query(int? employeeId, DateTime? fromUtc, DateTime? toUtc, int limit)
         {
-            using (var ctx = _contextFactory())
-            {
-                IQueryable<LoginAttempt> q = ctx.LoginAttempts.AsNoTracking();
-                if (employeeId.HasValue) q = q.Where(a => a.EmployeeId == employeeId.Value);
-                if (fromUtc.HasValue) q = q.Where(a => a.Timestamp >= fromUtc.Value);
-                if (toUtc.HasValue) q = q.Where(a => a.Timestamp <= toUtc.Value);
-                if (limit <= 0) limit = 100;
-                return q.OrderByDescending(a => a.Timestamp).Take(limit).ToList();
-            }
+            IQueryable<LoginAttempt> q = _ctx.LoginAttempts.AsNoTracking();
+            if (employeeId.HasValue) q = q.Where(a => a.EmployeeId == employeeId.Value);
+            if (fromUtc.HasValue) q = q.Where(a => a.Timestamp >= fromUtc.Value);
+            if (toUtc.HasValue) q = q.Where(a => a.Timestamp <= toUtc.Value);
+            if (limit <= 0) limit = 100;
+            return q.OrderByDescending(a => a.Timestamp).Take(limit).ToList();
         }
     }
 }

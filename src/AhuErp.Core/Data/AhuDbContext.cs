@@ -509,7 +509,7 @@ namespace AhuErp.Core.Data
                 .HasForeignKey(a => a.EmployeeId)
                 .WillCascadeOnDelete(false);
 
-            modelBuilder.Entity<EmployeePasswordHistory>().ToTable("EmployeePasswordHistory");
+            modelBuilder.Entity<EmployeePasswordHistory>().ToTable("EmployeePasswordHistories");
             modelBuilder.Entity<EmployeePasswordHistory>()
                 .HasRequired(h => h.Employee)
                 .WithMany(e => e.PasswordHistory)

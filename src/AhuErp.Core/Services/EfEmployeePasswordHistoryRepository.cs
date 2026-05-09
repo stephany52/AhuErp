@@ -9,53 +9,46 @@ namespace AhuErp.Core.Services
 {
     /// <summary>
     /// EF6 реализация <see cref="IEmployeePasswordHistoryRepository"/>.
+    /// Принимает singleton-<see cref="AhuDbContext"/> напрямую (как и остальные
+    /// EF-репозитории проекта), MS DI не резолвит <c>Func&lt;T&gt;</c>.
     /// </summary>
     public sealed class EfEmployeePasswordHistoryRepository : IEmployeePasswordHistoryRepository
     {
-        private readonly Func<AhuDbContext> _contextFactory;
+        private readonly AhuDbContext _ctx;
 
-        public EfEmployeePasswordHistoryRepository(Func<AhuDbContext> contextFactory)
+        public EfEmployeePasswordHistoryRepository(AhuDbContext ctx)
         {
-            _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
+            _ctx = ctx ?? throw new ArgumentNullException(nameof(ctx));
         }
 
         public IReadOnlyList<EmployeePasswordHistory> ListForEmployee(int employeeId)
         {
-            using (var ctx = _contextFactory())
-            {
-                return ctx.EmployeePasswordHistories.AsNoTracking()
-                    .Where(e => e.EmployeeId == employeeId)
-                    .OrderByDescending(e => e.SetAt)
-                    .ToList();
-            }
+            return _ctx.EmployeePasswordHistories.AsNoTracking()
+                .Where(e => e.EmployeeId == employeeId)
+                .OrderByDescending(e => e.SetAt)
+                .ToList();
         }
 
         public EmployeePasswordHistory Add(EmployeePasswordHistory entry)
         {
             if (entry == null) throw new ArgumentNullException(nameof(entry));
-            using (var ctx = _contextFactory())
-            {
-                ctx.EmployeePasswordHistories.Add(entry);
-                ctx.SaveChanges();
-                return entry;
-            }
+            _ctx.EmployeePasswordHistories.Add(entry);
+            _ctx.SaveChanges();
+            return entry;
         }
 
         public void TrimToDepth(int employeeId, int depth)
         {
             if (depth <= 0) return;
-            using (var ctx = _contextFactory())
-            {
-                var stale = ctx.EmployeePasswordHistories
-                    .Where(e => e.EmployeeId == employeeId)
-                    .OrderByDescending(e => e.SetAt)
-                    .Skip(depth)
-                    .ToList();
+            var stale = _ctx.EmployeePasswordHistories
+                .Where(e => e.EmployeeId == employeeId)
+                .OrderByDescending(e => e.SetAt)
+                .Skip(depth)
+                .ToList();
 
-                if (stale.Count == 0) return;
-                foreach (var s in stale) ctx.EmployeePasswordHistories.Remove(s);
-                ctx.SaveChanges();
-            }
+            if (stale.Count == 0) return;
+            foreach (var s in stale) _ctx.EmployeePasswordHistories.Remove(s);
+            _ctx.SaveChanges();
         }
     }
 }

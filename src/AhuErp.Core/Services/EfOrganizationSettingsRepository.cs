@@ -10,33 +10,31 @@ namespace AhuErp.Core.Services
     /// EF6 реализация <see cref="IOrganizationSettingsRepository"/>.
     /// Singleton-запись хранится с фиксированным ID = 1; если её ещё нет
     /// в БД, создаётся при первом обращении к <see cref="Get"/> с
-    /// дефолтными значениями.
+    /// дефолтными значениями. Принимает singleton-<see cref="AhuDbContext"/>
+    /// напрямую (как и остальные EF-репозитории проекта).
     /// </summary>
     public sealed class EfOrganizationSettingsRepository : IOrganizationSettingsRepository
     {
-        private readonly Func<AhuDbContext> _contextFactory;
+        private readonly AhuDbContext _ctx;
         private readonly object _sync = new object();
 
-        public EfOrganizationSettingsRepository(Func<AhuDbContext> contextFactory)
+        public EfOrganizationSettingsRepository(AhuDbContext ctx)
         {
-            _contextFactory = contextFactory ?? throw new ArgumentNullException(nameof(contextFactory));
+            _ctx = ctx ?? throw new ArgumentNullException(nameof(ctx));
         }
 
         public OrganizationSettings Get()
         {
             lock (_sync)
             {
-                using (var ctx = _contextFactory())
-                {
-                    var existing = ctx.OrganizationSettings.AsNoTracking()
-                        .FirstOrDefault(s => s.Id == OrganizationSettings.SingletonId);
-                    if (existing != null) return existing;
+                var existing = _ctx.OrganizationSettings.AsNoTracking()
+                    .FirstOrDefault(s => s.Id == OrganizationSettings.SingletonId);
+                if (existing != null) return existing;
 
-                    var fresh = new OrganizationSettings { Id = OrganizationSettings.SingletonId };
-                    ctx.OrganizationSettings.Add(fresh);
-                    ctx.SaveChanges();
-                    return fresh;
-                }
+                var fresh = new OrganizationSettings { Id = OrganizationSettings.SingletonId };
+                _ctx.OrganizationSettings.Add(fresh);
+                _ctx.SaveChanges();
+                return fresh;
             }
         }
 
@@ -46,28 +44,25 @@ namespace AhuErp.Core.Services
 
             lock (_sync)
             {
-                using (var ctx = _contextFactory())
+                var existing = _ctx.OrganizationSettings
+                    .FirstOrDefault(s => s.Id == OrganizationSettings.SingletonId);
+                if (existing == null)
                 {
-                    var existing = ctx.OrganizationSettings
-                        .FirstOrDefault(s => s.Id == OrganizationSettings.SingletonId);
-                    if (existing == null)
-                    {
-                        settings.Id = OrganizationSettings.SingletonId;
-                        ctx.OrganizationSettings.Add(settings);
-                    }
-                    else
-                    {
-                        existing.EncryptionKey = settings.EncryptionKey;
-                        existing.EncryptionKeyGeneratedAt = settings.EncryptionKeyGeneratedAt;
-                        existing.PasswordMinLength = settings.PasswordMinLength;
-                        existing.PasswordExpiryDays = settings.PasswordExpiryDays;
-                        existing.PasswordHistoryDepth = settings.PasswordHistoryDepth;
-                        existing.LockoutFailureThreshold = settings.LockoutFailureThreshold;
-                        existing.LockoutWindowMinutes = settings.LockoutWindowMinutes;
-                        existing.LockoutDurationMinutes = settings.LockoutDurationMinutes;
-                    }
-                    ctx.SaveChanges();
+                    settings.Id = OrganizationSettings.SingletonId;
+                    _ctx.OrganizationSettings.Add(settings);
                 }
+                else
+                {
+                    existing.EncryptionKey = settings.EncryptionKey;
+                    existing.EncryptionKeyGeneratedAt = settings.EncryptionKeyGeneratedAt;
+                    existing.PasswordMinLength = settings.PasswordMinLength;
+                    existing.PasswordExpiryDays = settings.PasswordExpiryDays;
+                    existing.PasswordHistoryDepth = settings.PasswordHistoryDepth;
+                    existing.LockoutFailureThreshold = settings.LockoutFailureThreshold;
+                    existing.LockoutWindowMinutes = settings.LockoutWindowMinutes;
+                    existing.LockoutDurationMinutes = settings.LockoutDurationMinutes;
+                }
+                _ctx.SaveChanges();
             }
         }
     }

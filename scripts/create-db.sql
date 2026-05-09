@@ -645,12 +645,13 @@ BEGIN
 END
 GO
 
-/* OrganizationSettings — singleton (Id=1). */
+/* OrganizationSettings — singleton (Id = 1, без IDENTITY: EF6-конфигурация
+   использует DatabaseGeneratedOption.None, INSERT идёт с явным Id=1). */
 IF OBJECT_ID(N'dbo.OrganizationSettings', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.OrganizationSettings
     (
-        Id                          INT             IDENTITY(1, 1) NOT NULL,
+        Id                          INT             NOT NULL,
         EncryptionKey               NVARCHAR(512)   NULL,
         EncryptionKeyGeneratedAt    DATETIME        NULL,
         PasswordMinLength           INT             NOT NULL CONSTRAINT DF_OrgSettings_PwdMinLen          DEFAULT (8),
@@ -682,18 +683,20 @@ BEGIN
 END
 GO
 
-/* LoginAttempts — журнал попыток входа (success/failure + причина + IP). */
+/* LoginAttempts — журнал попыток входа (success/failure + причина + IP).
+   Колонка AttemptedFullName хранит ФИО, под которым была попытка входа,
+   и совпадает по имени со свойством LoginAttempt.AttemptedFullName в EF. */
 IF OBJECT_ID(N'dbo.LoginAttempts', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.LoginAttempts
     (
-        Id             INT             IDENTITY(1, 1) NOT NULL,
-        EmployeeId     INT             NULL,
-        LoginName      NVARCHAR(256)   NULL,
-        Timestamp      DATETIME        NOT NULL,
-        IpAddress      NVARCHAR(64)    NULL,
-        Success        BIT             NOT NULL CONSTRAINT DF_LoginAttempts_Success DEFAULT (0),
-        FailureReason  INT             NULL,
+        Id                INT             IDENTITY(1, 1) NOT NULL,
+        EmployeeId        INT             NULL,
+        AttemptedFullName NVARCHAR(256)   NULL,
+        Timestamp         DATETIME        NOT NULL,
+        IpAddress         NVARCHAR(64)    NULL,
+        Success           BIT             NOT NULL CONSTRAINT DF_LoginAttempts_Success DEFAULT (0),
+        FailureReason     INT             NOT NULL CONSTRAINT DF_LoginAttempts_FailureReason DEFAULT (0),
         CONSTRAINT PK_dbo_LoginAttempts PRIMARY KEY CLUSTERED (Id ASC),
         CONSTRAINT [FK_dbo.LoginAttempts_dbo.Employees_EmployeeId]
             FOREIGN KEY (EmployeeId) REFERENCES dbo.Employees (Id) ON DELETE CASCADE
