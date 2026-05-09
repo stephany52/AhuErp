@@ -37,7 +37,7 @@ namespace AhuErp.Core.Migrations
                 .Index(t => t.Timestamp);
 
             CreateTable(
-                "dbo.EmployeePasswordHistory",
+                "dbo.EmployeePasswordHistories",
                 c => new
                 {
                     Id = c.Int(nullable: false, identity: true),
@@ -92,9 +92,9 @@ namespace AhuErp.Core.Migrations
 
             DropTable("dbo.OrganizationSettings");
 
-            DropForeignKey("dbo.EmployeePasswordHistory", "EmployeeId", "dbo.Employees");
-            DropIndex("dbo.EmployeePasswordHistory", new[] { "EmployeeId" });
-            DropTable("dbo.EmployeePasswordHistory");
+            DropForeignKey("dbo.EmployeePasswordHistories", "EmployeeId", "dbo.Employees");
+            DropIndex("dbo.EmployeePasswordHistories", new[] { "EmployeeId" });
+            DropTable("dbo.EmployeePasswordHistories");
 
             DropForeignKey("dbo.LoginAttempts", "EmployeeId", "dbo.Employees");
             DropIndex("dbo.LoginAttempts", new[] { "Timestamp" });
