@@ -133,6 +133,12 @@ namespace AhuErp.UI.Infrastructure
             services.AddSingleton<IItTicketDiagnosticRepository, EfItTicketDiagnosticRepository>();
             services.AddSingleton<IItServiceMetricsProvider, ItServiceMetricsProvider>();
 
+            // Phase 15 / Improvement #12 — журналы регистрации (ОТ/ПБ, инвентаризации,
+            // передача дел в архив). VehicleTrip уже хранится через IVehicleRepository.
+            services.AddSingleton<ISafetyBriefingRepository, EfSafetyBriefingRepository>();
+            services.AddSingleton<IInventarizationRepository, EfInventarizationRepository>();
+            services.AddSingleton<IArchiveTransferRepository, EfArchiveTransferRepository>();
+
             // Phase 16 / Bug #8 + Improvement #17 — журнал входов, история паролей,
             // парольная политика, шифрование Document.Summary, настройки учреждения.
             services.AddSingleton<ILoginAttemptRepository, EfLoginAttemptRepository>();

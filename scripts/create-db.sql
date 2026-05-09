@@ -191,6 +191,15 @@ BEGIN
 END
 GO
 
+/* ---------- 3a. Vehicles: учёт ГСМ (Phase 15 / Improvement #12) ----------- */
+IF COL_LENGTH(N'dbo.Vehicles', N'FuelType') IS NULL
+BEGIN
+    ALTER TABLE dbo.Vehicles
+        ADD FuelType                 INT             NOT NULL CONSTRAINT DF_Vehicles_FuelType DEFAULT (0),
+            FuelConsumptionPer100Km  DECIMAL(7, 2)   NOT NULL CONSTRAINT DF_Vehicles_FuelConsumptionPer100Km DEFAULT (0);
+END
+GO
+
 /* ---------- 4. VehicleTrips ------------------------------------------------ */
 IF OBJECT_ID(N'dbo.VehicleTrips', N'U') IS NULL
 BEGIN
@@ -236,6 +245,20 @@ BEGIN
 
     CREATE NONCLUSTERED INDEX IX_VehicleTrips_BasisDocumentId
         ON dbo.VehicleTrips (BasisDocumentId);
+END
+GO
+
+/* ---------- 4b. VehicleTrips: учёт ГСМ (Phase 15 / Improvement #12) -------- */
+IF COL_LENGTH(N'dbo.VehicleTrips', N'OdometerStart') IS NULL
+BEGIN
+    ALTER TABLE dbo.VehicleTrips
+        ADD OdometerStart    INT             NULL,
+            OdometerEnd      INT             NULL,
+            FuelIssuedLiters DECIMAL(9, 2)   NULL,
+            Route            NVARCHAR(512)   NULL,
+            PassengerNames   NVARCHAR(1024)  NULL,
+            ActualStart      DATETIME        NULL,
+            ActualEnd        DATETIME        NULL;
 END
 GO
 
@@ -494,6 +517,120 @@ BEGIN
     CREATE NONCLUSTERED INDEX IX_DocumentApprovals_DocumentId ON dbo.DocumentApprovals (DocumentId);
     CREATE NONCLUSTERED INDEX IX_DocumentApprovals_StageId    ON dbo.DocumentApprovals (StageId);
     CREATE NONCLUSTERED INDEX IX_DocumentApprovals_ApproverId ON dbo.DocumentApprovals (ApproverId);
+END
+GO
+
+/* ---------- 13a. SafetyBriefings (Phase 15 / Improvement #12) ------------- */
+IF OBJECT_ID(N'dbo.SafetyBriefings', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.SafetyBriefings
+    (
+        Id                    INT             IDENTITY(1, 1) NOT NULL,
+        BriefingDate          DATETIME        NOT NULL,
+        Kind                  INT             NOT NULL,
+        Topic                 NVARCHAR(256)   NOT NULL,
+        TraineeEmployeeId     INT             NOT NULL,
+        InstructorEmployeeId  INT             NOT NULL,
+        SignatureConfirmed    BIT             NOT NULL,
+        Notes                 NVARCHAR(2048)  NULL,
+        CONSTRAINT PK_dbo_SafetyBriefings PRIMARY KEY CLUSTERED (Id ASC),
+        CONSTRAINT [FK_dbo.SafetyBriefings_dbo.Employees_TraineeEmployeeId]
+            FOREIGN KEY (TraineeEmployeeId) REFERENCES dbo.Employees (Id),
+        CONSTRAINT [FK_dbo.SafetyBriefings_dbo.Employees_InstructorEmployeeId]
+            FOREIGN KEY (InstructorEmployeeId) REFERENCES dbo.Employees (Id)
+    );
+    CREATE NONCLUSTERED INDEX IX_SafetyBriefings_TraineeEmployeeId
+        ON dbo.SafetyBriefings (TraineeEmployeeId);
+    CREATE NONCLUSTERED INDEX IX_SafetyBriefings_InstructorEmployeeId
+        ON dbo.SafetyBriefings (InstructorEmployeeId);
+    CREATE NONCLUSTERED INDEX IX_SafetyBriefings_Date_Kind
+        ON dbo.SafetyBriefings (BriefingDate, Kind);
+END
+GO
+
+/* ---------- 13b. Inventarizations (Phase 15 / Improvement #12) ------------ */
+IF OBJECT_ID(N'dbo.Inventarizations', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.Inventarizations
+    (
+        Id                  INT             IDENTITY(1, 1) NOT NULL,
+        StartDate           DATETIME        NOT NULL,
+        EndDate             DATETIME        NULL,
+        Scope               INT             NOT NULL,
+        ScopeDescription    NVARCHAR(256)   NOT NULL,
+        CommissionMembers   NVARCHAR(2048)  NULL,
+        ChairmanId          INT             NULL,
+        ResultDocumentId    INT             NULL,
+        Notes               NVARCHAR(2048)  NULL,
+        CONSTRAINT PK_dbo_Inventarizations PRIMARY KEY CLUSTERED (Id ASC),
+        CONSTRAINT [FK_dbo.Inventarizations_dbo.Employees_ChairmanId]
+            FOREIGN KEY (ChairmanId) REFERENCES dbo.Employees (Id),
+        CONSTRAINT [FK_dbo.Inventarizations_dbo.Documents_ResultDocumentId]
+            FOREIGN KEY (ResultDocumentId) REFERENCES dbo.Documents (Id)
+    );
+    CREATE NONCLUSTERED INDEX IX_Inventarizations_ChairmanId
+        ON dbo.Inventarizations (ChairmanId);
+    CREATE NONCLUSTERED INDEX IX_Inventarizations_ResultDocumentId
+        ON dbo.Inventarizations (ResultDocumentId);
+    CREATE NONCLUSTERED INDEX IX_Inventarizations_Date_Scope
+        ON dbo.Inventarizations (StartDate, Scope);
+END
+GO
+
+/* ---------- 13c. InventarizationDiscrepancies (Phase 15 / Improvement #12)  */
+IF OBJECT_ID(N'dbo.InventarizationDiscrepancies', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.InventarizationDiscrepancies
+    (
+        Id                INT             IDENTITY(1, 1) NOT NULL,
+        InventarizationId INT             NOT NULL,
+        ItemName          NVARCHAR(256)   NOT NULL,
+        ExpectedQuantity  DECIMAL(18, 3)  NOT NULL,
+        ActualQuantity    DECIMAL(18, 3)  NOT NULL,
+        Reason            NVARCHAR(512)   NULL,
+        CONSTRAINT PK_dbo_InventarizationDiscrepancies PRIMARY KEY CLUSTERED (Id ASC),
+        CONSTRAINT [FK_dbo.InventarizationDiscrepancies_dbo.Inventarizations_InventarizationId]
+            FOREIGN KEY (InventarizationId) REFERENCES dbo.Inventarizations (Id) ON DELETE CASCADE
+    );
+    CREATE NONCLUSTERED INDEX IX_InventarizationDiscrepancies_InventarizationId
+        ON dbo.InventarizationDiscrepancies (InventarizationId);
+END
+GO
+
+/* ---------- 13d. ArchiveTransfers (Phase 15 / Improvement #12) ------------ */
+IF OBJECT_ID(N'dbo.ArchiveTransfers', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.ArchiveTransfers
+    (
+        Id                  INT            IDENTITY(1, 1) NOT NULL,
+        NomenclatureCaseId  INT            NOT NULL,
+        TransferDate        DATETIME       NOT NULL,
+        TransferredById     INT            NULL,
+        AcceptedById        INT            NULL,
+        ActDocumentId       INT            NULL,
+        ArchiveCode         NVARCHAR(64)   NULL,
+        RetentionYears      INT            NOT NULL,
+        Notes               NVARCHAR(2048) NULL,
+        CONSTRAINT PK_dbo_ArchiveTransfers PRIMARY KEY CLUSTERED (Id ASC),
+        CONSTRAINT [FK_dbo.ArchiveTransfers_dbo.NomenclatureCases_NomenclatureCaseId]
+            FOREIGN KEY (NomenclatureCaseId) REFERENCES dbo.NomenclatureCases (Id),
+        CONSTRAINT [FK_dbo.ArchiveTransfers_dbo.Employees_TransferredById]
+            FOREIGN KEY (TransferredById) REFERENCES dbo.Employees (Id),
+        CONSTRAINT [FK_dbo.ArchiveTransfers_dbo.Employees_AcceptedById]
+            FOREIGN KEY (AcceptedById) REFERENCES dbo.Employees (Id),
+        CONSTRAINT [FK_dbo.ArchiveTransfers_dbo.Documents_ActDocumentId]
+            FOREIGN KEY (ActDocumentId) REFERENCES dbo.Documents (Id)
+    );
+    CREATE NONCLUSTERED INDEX IX_ArchiveTransfers_NomenclatureCaseId
+        ON dbo.ArchiveTransfers (NomenclatureCaseId);
+    CREATE NONCLUSTERED INDEX IX_ArchiveTransfers_TransferredById
+        ON dbo.ArchiveTransfers (TransferredById);
+    CREATE NONCLUSTERED INDEX IX_ArchiveTransfers_AcceptedById
+        ON dbo.ArchiveTransfers (AcceptedById);
+    CREATE NONCLUSTERED INDEX IX_ArchiveTransfers_ActDocumentId
+        ON dbo.ArchiveTransfers (ActDocumentId);
+    CREATE NONCLUSTERED INDEX IX_ArchiveTransfers_Date
+        ON dbo.ArchiveTransfers (TransferDate);
 END
 GO
 

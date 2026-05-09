@@ -883,5 +883,298 @@ namespace AhuErp.Core.Services
             if (string.IsNullOrEmpty(s)) return string.Empty;
             return s.Length <= max ? s : s.Substring(0, max - 1) + "…";
         }
+
+        // ------------------------------------------------------------
+        // Phase 15 / Improvement #12 — журналы регистрации.
+        // ------------------------------------------------------------
+
+        public void ExportFuelLog(IEnumerable<VehicleTrip> trips, DateTime from, DateTime to, string filePath)
+        {
+            if (trips == null) throw new ArgumentNullException(nameof(trips));
+            if (string.IsNullOrWhiteSpace(filePath))
+                throw new ArgumentException("Путь к файлу обязателен.", nameof(filePath));
+
+            var rows = trips
+                .Where(t => t != null)
+                .OrderBy(t => t.ActualStart ?? t.StartDate)
+                .ToList();
+
+            using (var workbook = new XLWorkbook())
+            {
+                var sheet = workbook.Worksheets.Add("Журнал ГСМ");
+                sheet.Cell(1, 1).Value = "Журнал учёта ГСМ";
+                sheet.Range(1, 1, 1, 11).Merge().Style
+                    .Font.SetBold(true).Font.SetFontSize(14)
+                    .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center);
+                sheet.Cell(2, 1).Value = $"Период: {from:dd.MM.yyyy} — {to:dd.MM.yyyy}";
+                sheet.Range(2, 1, 2, 11).Merge();
+
+                int header = 4;
+                sheet.Cell(header, 1).Value = "Дата";
+                sheet.Cell(header, 2).Value = "ТС (марка, гос. №)";
+                sheet.Cell(header, 3).Value = "Топливо";
+                sheet.Cell(header, 4).Value = "Водитель";
+                sheet.Cell(header, 5).Value = "Маршрут";
+                sheet.Cell(header, 6).Value = "Одометр старт";
+                sheet.Cell(header, 7).Value = "Одометр финиш";
+                sheet.Cell(header, 8).Value = "Пробег, км";
+                sheet.Cell(header, 9).Value = "Выдано, л";
+                sheet.Cell(header, 10).Value = "Расход, л";
+                sheet.Cell(header, 11).Value = "Документ-основание";
+
+                var hdr = sheet.Range(header, 1, header, 11);
+                hdr.Style.Font.Bold = true;
+                hdr.Style.Fill.BackgroundColor = XLColor.LightSteelBlue;
+                hdr.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                hdr.Style.Border.BottomBorder = XLBorderStyleValues.Medium;
+
+                int row = header + 1;
+                foreach (var t in rows)
+                {
+                    var vehicle = t.Vehicle;
+                    sheet.Cell(row, 1).Value = (t.ActualStart ?? t.StartDate).ToString("dd.MM.yyyy");
+                    sheet.Cell(row, 2).Value = vehicle != null
+                        ? $"{vehicle.Model} {vehicle.LicensePlate}".Trim()
+                        : "—";
+                    sheet.Cell(row, 3).Value = vehicle != null ? FormatFuelType(vehicle.FuelType) : "—";
+                    sheet.Cell(row, 4).Value = string.IsNullOrWhiteSpace(t.DriverName) ? "—" : t.DriverName;
+                    sheet.Cell(row, 5).Value = t.Route ?? string.Empty;
+                    sheet.Cell(row, 6).Value = t.OdometerStart?.ToString() ?? "—";
+                    sheet.Cell(row, 7).Value = t.OdometerEnd?.ToString() ?? "—";
+                    sheet.Cell(row, 8).Value = t.DistanceKm?.ToString() ?? "—";
+                    sheet.Cell(row, 9).Value = t.FuelIssuedLiters?.ToString("0.##") ?? "—";
+                    sheet.Cell(row, 10).Value = t.FuelUsedLiters?.ToString("0.##") ?? "—";
+                    var basis = t.BasisDocument ?? t.Document;
+                    sheet.Cell(row, 11).Value = basis != null
+                        ? (basis.RegistrationNumber ?? basis.Title ?? string.Empty)
+                        : string.Empty;
+                    row++;
+                }
+
+                sheet.Columns().AdjustToContents();
+                sheet.Column(5).Width = Math.Min(60, sheet.Column(5).Width);
+                workbook.SaveAs(filePath);
+            }
+        }
+
+        public void ExportSafetyBriefingsJournal(IEnumerable<SafetyBriefing> briefings, string filePath)
+        {
+            if (briefings == null) throw new ArgumentNullException(nameof(briefings));
+            if (string.IsNullOrWhiteSpace(filePath))
+                throw new ArgumentException("Путь к файлу обязателен.", nameof(filePath));
+
+            var rows = briefings.Where(b => b != null).OrderBy(b => b.BriefingDate).ToList();
+
+            using (var workbook = new XLWorkbook())
+            {
+                var sheet = workbook.Worksheets.Add("Журнал ОТ_ПБ");
+                sheet.Cell(1, 1).Value = "Журнал инструктажей по охране труда / пожарной безопасности";
+                sheet.Range(1, 1, 1, 7).Merge().Style
+                    .Font.SetBold(true).Font.SetFontSize(14)
+                    .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center);
+                sheet.Cell(2, 1).Value = $"Сформировано: {DateTime.Now:dd.MM.yyyy HH:mm}";
+                sheet.Range(2, 1, 2, 7).Merge();
+
+                int header = 4;
+                sheet.Cell(header, 1).Value = "Дата";
+                sheet.Cell(header, 2).Value = "Вид инструктажа";
+                sheet.Cell(header, 3).Value = "Тема";
+                sheet.Cell(header, 4).Value = "Инструктируемый";
+                sheet.Cell(header, 5).Value = "Инструктор";
+                sheet.Cell(header, 6).Value = "Подпись";
+                sheet.Cell(header, 7).Value = "Примечания";
+
+                var hdr = sheet.Range(header, 1, header, 7);
+                hdr.Style.Font.Bold = true;
+                hdr.Style.Fill.BackgroundColor = XLColor.LightSteelBlue;
+                hdr.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                hdr.Style.Border.BottomBorder = XLBorderStyleValues.Medium;
+
+                int row = header + 1;
+                foreach (var b in rows)
+                {
+                    sheet.Cell(row, 1).Value = b.BriefingDate.ToString("dd.MM.yyyy");
+                    sheet.Cell(row, 2).Value = FormatBriefingKind(b.Kind);
+                    sheet.Cell(row, 3).Value = b.Topic ?? string.Empty;
+                    sheet.Cell(row, 4).Value = b.TraineeEmployee?.FullName ?? "—";
+                    sheet.Cell(row, 5).Value = b.InstructorEmployee?.FullName ?? "—";
+                    sheet.Cell(row, 6).Value = b.SignatureConfirmed ? "Подписано" : "Не подписано";
+                    sheet.Cell(row, 7).Value = b.Notes ?? string.Empty;
+                    row++;
+                }
+
+                sheet.Columns().AdjustToContents();
+                sheet.Column(3).Width = Math.Min(50, sheet.Column(3).Width);
+                sheet.Column(7).Width = Math.Min(50, sheet.Column(7).Width);
+                workbook.SaveAs(filePath);
+            }
+        }
+
+        public void ExportInventarizationsJournal(IEnumerable<Inventarization> inventarizations, string filePath)
+        {
+            if (inventarizations == null) throw new ArgumentNullException(nameof(inventarizations));
+            if (string.IsNullOrWhiteSpace(filePath))
+                throw new ArgumentException("Путь к файлу обязателен.", nameof(filePath));
+
+            var rows = inventarizations.Where(i => i != null).OrderBy(i => i.StartDate).ToList();
+
+            using (var workbook = new XLWorkbook())
+            {
+                var sheet = workbook.Worksheets.Add("Журнал инвентаризаций");
+                sheet.Cell(1, 1).Value = "Журнал инвентаризаций";
+                sheet.Range(1, 1, 1, 8).Merge().Style
+                    .Font.SetBold(true).Font.SetFontSize(14)
+                    .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center);
+                sheet.Cell(2, 1).Value = $"Сформировано: {DateTime.Now:dd.MM.yyyy HH:mm}";
+                sheet.Range(2, 1, 2, 8).Merge();
+
+                int header = 4;
+                sheet.Cell(header, 1).Value = "Дата начала";
+                sheet.Cell(header, 2).Value = "Дата окончания";
+                sheet.Cell(header, 3).Value = "Объект";
+                sheet.Cell(header, 4).Value = "Описание объекта";
+                sheet.Cell(header, 5).Value = "Председатель";
+                sheet.Cell(header, 6).Value = "Состав комиссии";
+                sheet.Cell(header, 7).Value = "Расхождений";
+                sheet.Cell(header, 8).Value = "Документ-акт";
+
+                var hdr = sheet.Range(header, 1, header, 8);
+                hdr.Style.Font.Bold = true;
+                hdr.Style.Fill.BackgroundColor = XLColor.LightSteelBlue;
+                hdr.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                hdr.Style.Border.BottomBorder = XLBorderStyleValues.Medium;
+
+                int row = header + 1;
+                foreach (var inv in rows)
+                {
+                    sheet.Cell(row, 1).Value = inv.StartDate.ToString("dd.MM.yyyy");
+                    sheet.Cell(row, 2).Value = inv.EndDate?.ToString("dd.MM.yyyy") ?? "—";
+                    sheet.Cell(row, 3).Value = FormatInventarizationScope(inv.Scope);
+                    sheet.Cell(row, 4).Value = inv.ScopeDescription ?? string.Empty;
+                    sheet.Cell(row, 5).Value = inv.Chairman?.FullName ?? "—";
+                    sheet.Cell(row, 6).Value = inv.CommissionMembers ?? string.Empty;
+                    sheet.Cell(row, 7).Value = inv.Discrepancies?.Count ?? 0;
+                    sheet.Cell(row, 8).Value = inv.ResultDocument?.RegistrationNumber
+                        ?? inv.ResultDocument?.Title
+                        ?? string.Empty;
+                    row++;
+                }
+
+                sheet.Columns().AdjustToContents();
+                sheet.Column(4).Width = Math.Min(50, sheet.Column(4).Width);
+                sheet.Column(6).Width = Math.Min(50, sheet.Column(6).Width);
+                workbook.SaveAs(filePath);
+            }
+        }
+
+        public void ExportArchiveTransferJournal(IEnumerable<ArchiveTransfer> transfers, string filePath)
+        {
+            if (transfers == null) throw new ArgumentNullException(nameof(transfers));
+            if (string.IsNullOrWhiteSpace(filePath))
+                throw new ArgumentException("Путь к файлу обязателен.", nameof(filePath));
+
+            var rows = transfers.Where(t => t != null).OrderBy(t => t.TransferDate).ToList();
+
+            using (var workbook = new XLWorkbook())
+            {
+                var sheet = workbook.Worksheets.Add("Журнал передачи в архив");
+                sheet.Cell(1, 1).Value = "Журнал передачи дел в архив";
+                sheet.Range(1, 1, 1, 9).Merge().Style
+                    .Font.SetBold(true).Font.SetFontSize(14)
+                    .Alignment.SetHorizontal(XLAlignmentHorizontalValues.Center);
+                sheet.Cell(2, 1).Value = $"Сформировано: {DateTime.Now:dd.MM.yyyy HH:mm}";
+                sheet.Range(2, 1, 2, 9).Merge();
+
+                int header = 4;
+                sheet.Cell(header, 1).Value = "Дата";
+                sheet.Cell(header, 2).Value = "Дело (индекс)";
+                sheet.Cell(header, 3).Value = "Заголовок дела";
+                sheet.Cell(header, 4).Value = "Архивный шифр";
+                sheet.Cell(header, 5).Value = "Передал";
+                sheet.Cell(header, 6).Value = "Принял";
+                sheet.Cell(header, 7).Value = "Акт";
+                sheet.Cell(header, 8).Value = "Срок хранения";
+                sheet.Cell(header, 9).Value = "Заметки";
+
+                var hdr = sheet.Range(header, 1, header, 9);
+                hdr.Style.Font.Bold = true;
+                hdr.Style.Fill.BackgroundColor = XLColor.LightSteelBlue;
+                hdr.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                hdr.Style.Border.BottomBorder = XLBorderStyleValues.Medium;
+
+                int row = header + 1;
+                foreach (var t in rows)
+                {
+                    sheet.Cell(row, 1).Value = t.TransferDate.ToString("dd.MM.yyyy");
+                    sheet.Cell(row, 2).Value = t.NomenclatureCase?.Index ?? "—";
+                    sheet.Cell(row, 3).Value = t.NomenclatureCase?.Title ?? string.Empty;
+                    sheet.Cell(row, 4).Value = t.ArchiveCode ?? string.Empty;
+                    sheet.Cell(row, 5).Value = t.TransferredBy?.FullName ?? "—";
+                    sheet.Cell(row, 6).Value = t.AcceptedBy?.FullName ?? "—";
+                    sheet.Cell(row, 7).Value = t.ActDocument?.RegistrationNumber
+                        ?? t.ActDocument?.Title
+                        ?? string.Empty;
+                    sheet.Cell(row, 8).Value = t.RetentionYears > 0
+                        ? $"{t.RetentionYears} лет"
+                        : "Постоянно";
+                    sheet.Cell(row, 9).Value = t.Notes ?? string.Empty;
+                    row++;
+                }
+
+                sheet.Columns().AdjustToContents();
+                sheet.Column(3).Width = Math.Min(50, sheet.Column(3).Width);
+                sheet.Column(9).Width = Math.Min(40, sheet.Column(9).Width);
+                workbook.SaveAs(filePath);
+            }
+        }
+
+        public void ExportContractsJournal(IEnumerable<Document> contracts, DateTime from, DateTime to, string filePath)
+        {
+            if (contracts == null) throw new ArgumentNullException(nameof(contracts));
+            if (string.IsNullOrWhiteSpace(filePath))
+                throw new ArgumentException("Путь к файлу обязателен.", nameof(filePath));
+
+            ExportRegistrationJournal(contracts, $"Журнал договоров за {from:dd.MM.yyyy} — {to:dd.MM.yyyy}", filePath);
+        }
+
+        private static string FormatFuelType(FuelType fuel)
+        {
+            switch (fuel)
+            {
+                case FuelType.Petrol: return "Бензин";
+                case FuelType.Diesel: return "Дизель";
+                case FuelType.Gas: return "Газ";
+                case FuelType.Electric: return "Электро";
+                case FuelType.Hybrid: return "Гибрид";
+                default: return fuel.ToString();
+            }
+        }
+
+        private static string FormatBriefingKind(BriefingKind kind)
+        {
+            switch (kind)
+            {
+                case BriefingKind.Initial: return "Вводный";
+                case BriefingKind.PrimaryAtWorkplace: return "Первичный на рабочем месте";
+                case BriefingKind.Recurring: return "Повторный";
+                case BriefingKind.Targeted: return "Целевой";
+                case BriefingKind.Unscheduled: return "Внеплановый";
+                default: return kind.ToString();
+            }
+        }
+
+        private static string FormatInventarizationScope(InventarizationScope scope)
+        {
+            switch (scope)
+            {
+                case InventarizationScope.Inventory: return "Склад ТМЦ";
+                case InventarizationScope.FixedAssets: return "Основные средства";
+                case InventarizationScope.Documents: return "Номенклатура дел";
+                case InventarizationScope.Premises: return "Помещения";
+                case InventarizationScope.Vehicles: return "Транспорт";
+                case InventarizationScope.Other: return "Иное";
+                default: return scope.ToString();
+            }
+        }
     }
 }
