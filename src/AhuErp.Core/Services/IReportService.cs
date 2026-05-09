@@ -94,5 +94,41 @@ namespace AhuErp.Core.Services
         /// действие, актор, время, детали, хэш цепочки.
         /// </summary>
         void ExportDocumentAuditTrail(int documentId, string filePath);
+
+        // ------------------------------------------------------------
+        // Phase 15 / Improvement #12 — журналы регистрации (44-ФЗ + Устав).
+        // ------------------------------------------------------------
+
+        /// <summary>
+        /// Журнал учёта ГСМ за период (XLSX). Колонки: дата, ТС, водитель,
+        /// маршрут, одометр старт/финиш, пробег, выдано (л), расход (л),
+        /// топливо, документ-основание.
+        /// </summary>
+        void ExportFuelLog(IEnumerable<Models.VehicleTrip> trips, System.DateTime from, System.DateTime to, string filePath);
+
+        /// <summary>
+        /// Журнал инструктажей по охране труда / пожарной безопасности (XLSX).
+        /// Колонки: дата, вид инструктажа, тема, инструктируемый, инструктор,
+        /// подпись, примечания.
+        /// </summary>
+        void ExportSafetyBriefingsJournal(IEnumerable<Models.SafetyBriefing> briefings, string filePath);
+
+        /// <summary>
+        /// Журнал инвентаризаций (XLSX). Колонки: дата начала/окончания, объект,
+        /// председатель, состав комиссии, число расхождений, документ-акт, заметки.
+        /// </summary>
+        void ExportInventarizationsJournal(IEnumerable<Models.Inventarization> inventarizations, string filePath);
+
+        /// <summary>
+        /// Журнал передачи дел в архив (XLSX). Колонки: дата, дело,
+        /// архивный шифр, передал, принял, акт, срок хранения, заметки.
+        /// </summary>
+        void ExportArchiveTransferJournal(IEnumerable<Models.ArchiveTransfer> transfers, string filePath);
+
+        /// <summary>
+        /// Журнал договоров за период (XLSX). Использует общий формат
+        /// регистрационного журнала, но с заголовком «Журнал договоров».
+        /// </summary>
+        void ExportContractsJournal(IEnumerable<Models.Document> contracts, System.DateTime from, System.DateTime to, string filePath);
     }
 }

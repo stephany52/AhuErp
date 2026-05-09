@@ -73,6 +73,12 @@ namespace AhuErp.Core.Data
         public virtual DbSet<VideoConference> VideoConferences { get; set; }
         public virtual DbSet<ItTicketDiagnosticEntry> ItTicketDiagnosticEntries { get; set; }
 
+        // Phase 15 / Improvement #12 — журналы регистрации (ОТ/ПБ, инвентаризации, передача в архив).
+        public virtual DbSet<SafetyBriefing> SafetyBriefings { get; set; }
+        public virtual DbSet<Inventarization> Inventarizations { get; set; }
+        public virtual DbSet<InventarizationDiscrepancy> InventarizationDiscrepancies { get; set; }
+        public virtual DbSet<ArchiveTransfer> ArchiveTransfers { get; set; }
+
         // Phase 16 / Improvement #17 + Bug #8 — журнал входов, история паролей,
         // настройки учреждения (singleton с ключом шифрования и параметрами политики).
         public virtual DbSet<LoginAttempt> LoginAttempts { get; set; }
@@ -500,6 +506,81 @@ namespace AhuErp.Core.Data
                 .WithMany()
                 .HasForeignKey(v => v.OrganizerId)
                 .WillCascadeOnDelete(false);
+
+            // ---- Phase 15 / Improvement #12 — журналы регистрации. ----
+
+            modelBuilder.Entity<SafetyBriefing>().ToTable("SafetyBriefings");
+            modelBuilder.Entity<SafetyBriefing>()
+                .HasRequired(b => b.TraineeEmployee)
+                .WithMany()
+                .HasForeignKey(b => b.TraineeEmployeeId)
+                .WillCascadeOnDelete(false);
+            modelBuilder.Entity<SafetyBriefing>()
+                .HasRequired(b => b.InstructorEmployee)
+                .WithMany()
+                .HasForeignKey(b => b.InstructorEmployeeId)
+                .WillCascadeOnDelete(false);
+
+            modelBuilder.Entity<Inventarization>().ToTable("Inventarizations");
+            modelBuilder.Entity<Inventarization>()
+                .HasOptional(i => i.Chairman)
+                .WithMany()
+                .HasForeignKey(i => i.ChairmanId)
+                .WillCascadeOnDelete(false);
+            modelBuilder.Entity<Inventarization>()
+                .HasOptional(i => i.ResultDocument)
+                .WithMany()
+                .HasForeignKey(i => i.ResultDocumentId)
+                .WillCascadeOnDelete(false);
+
+            modelBuilder.Entity<InventarizationDiscrepancy>().ToTable("InventarizationDiscrepancies");
+            modelBuilder.Entity<InventarizationDiscrepancy>()
+                .Ignore(d => d.Delta);
+            modelBuilder.Entity<InventarizationDiscrepancy>()
+                .Property(d => d.ExpectedQuantity)
+                .HasPrecision(18, 3);
+            modelBuilder.Entity<InventarizationDiscrepancy>()
+                .Property(d => d.ActualQuantity)
+                .HasPrecision(18, 3);
+            modelBuilder.Entity<InventarizationDiscrepancy>()
+                .HasRequired(d => d.Inventarization)
+                .WithMany(i => i.Discrepancies)
+                .HasForeignKey(d => d.InventarizationId)
+                .WillCascadeOnDelete(true);
+
+            modelBuilder.Entity<ArchiveTransfer>().ToTable("ArchiveTransfers");
+            modelBuilder.Entity<ArchiveTransfer>()
+                .HasRequired(t => t.NomenclatureCase)
+                .WithMany()
+                .HasForeignKey(t => t.NomenclatureCaseId)
+                .WillCascadeOnDelete(false);
+            modelBuilder.Entity<ArchiveTransfer>()
+                .HasOptional(t => t.TransferredBy)
+                .WithMany()
+                .HasForeignKey(t => t.TransferredById)
+                .WillCascadeOnDelete(false);
+            modelBuilder.Entity<ArchiveTransfer>()
+                .HasOptional(t => t.AcceptedBy)
+                .WithMany()
+                .HasForeignKey(t => t.AcceptedById)
+                .WillCascadeOnDelete(false);
+            modelBuilder.Entity<ArchiveTransfer>()
+                .HasOptional(t => t.ActDocument)
+                .WithMany()
+                .HasForeignKey(t => t.ActDocumentId)
+                .WillCascadeOnDelete(false);
+
+            // Расширения автопарка для журнала ГСМ.
+            modelBuilder.Entity<Vehicle>()
+                .Property(v => v.FuelConsumptionPer100Km)
+                .HasPrecision(7, 2);
+            modelBuilder.Entity<VehicleTrip>()
+                .Property(t => t.FuelIssuedLiters)
+                .HasPrecision(9, 2);
+            modelBuilder.Entity<VehicleTrip>()
+                .Ignore(t => t.FuelUsedLiters);
+            modelBuilder.Entity<VehicleTrip>()
+                .Ignore(t => t.DistanceKm);
 
             // Phase 16 / Improvement #17 + Bug #8 — журнал входов, история паролей, настройки учреждения.
             modelBuilder.Entity<LoginAttempt>().ToTable("LoginAttempts");

@@ -347,6 +347,11 @@ namespace AhuErp.Tests
             public void ExportFleetReport(DateTime from, DateTime to, string filePath) { }
             public void ExportInventoryTurnoverReport(DateTime from, DateTime to, string filePath) { }
             public void ExportDocumentAuditTrail(int documentId, string filePath) { }
+            public void ExportFuelLog(IEnumerable<VehicleTrip> trips, DateTime from, DateTime to, string filePath) { }
+            public void ExportSafetyBriefingsJournal(IEnumerable<SafetyBriefing> briefings, string filePath) { }
+            public void ExportInventarizationsJournal(IEnumerable<Inventarization> inventarizations, string filePath) { }
+            public void ExportArchiveTransferJournal(IEnumerable<ArchiveTransfer> transfers, string filePath) { }
+            public void ExportContractsJournal(IEnumerable<Document> contracts, DateTime from, DateTime to, string filePath) { }
         }
 
         private sealed class StubFileDialogService : IFileDialogService
