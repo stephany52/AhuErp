@@ -50,6 +50,30 @@ namespace AhuErp.Core.Models
         /// <summary>Дата прекращения трудовых отношений (Phase 11).</summary>
         public DateTime? TerminatedAt { get; set; }
 
+        /// <summary>
+        /// Phase 16 / Improvement #17 — UTC-дата последней смены пароля.
+        /// Используется для проверки 90-дневного срока действия пароля.
+        /// <c>null</c> у демо-учёток / до первой смены — система считает,
+        /// что срок не истёк (для совместимости со seeded-данными).
+        /// </summary>
+        public DateTime? LastPasswordChangeAt { get; set; }
+
+        /// <summary>
+        /// Phase 16 / Improvement #17 — UTC-время до которого учётка
+        /// заблокирована (lockout). Если значение установлено и больше
+        /// <c>DateTime.UtcNow</c>, любая попытка входа отклоняется
+        /// с <see cref="Services.LoginFailureReason.AccountLocked"/>.
+        /// Сбрасывается администратором или автоматически по истечении.
+        /// </summary>
+        public DateTime? LockedUntil { get; set; }
+
         public virtual ICollection<Document> AssignedDocuments { get; set; } = new HashSet<Document>();
+
+        /// <summary>
+        /// Phase 16 — история паролей сотрудника (последние N штук).
+        /// Используется для проверки запрета повторного использования.
+        /// </summary>
+        public virtual ICollection<EmployeePasswordHistory> PasswordHistory { get; set; }
+            = new HashSet<EmployeePasswordHistory>();
     }
 }

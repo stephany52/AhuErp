@@ -31,5 +31,24 @@ namespace AhuErp.Core.Services
 
         public IReadOnlyList<Employee> ListAll()
             => _ctx.Employees.OrderBy(e => e.FullName).ToList().AsReadOnly();
+
+        public void Save(Employee employee)
+        {
+            if (employee == null) throw new ArgumentNullException(nameof(employee));
+
+            // EF6 на singleton-контексте уже трекает изменения возвращённого
+            // FindByFullName/Find экземпляра, так что SaveChanges достаточно.
+            // Если по какой-то причине entry в Detached-состоянии — переводим
+            // в Modified, чтобы изменения LockedUntil/LastPasswordChangeAt
+            // долетели до БД.
+            var entry = _ctx.Entry(employee);
+            if (entry.State == System.Data.Entity.EntityState.Detached)
+            {
+                _ctx.Employees.Attach(employee);
+                entry = _ctx.Entry(employee);
+                entry.State = System.Data.Entity.EntityState.Modified;
+            }
+            _ctx.SaveChanges();
+        }
     }
 }

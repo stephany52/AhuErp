@@ -73,6 +73,12 @@ namespace AhuErp.Core.Data
         public virtual DbSet<VideoConference> VideoConferences { get; set; }
         public virtual DbSet<ItTicketDiagnosticEntry> ItTicketDiagnosticEntries { get; set; }
 
+        // Phase 16 / Improvement #17 + Bug #8 — журнал входов, история паролей,
+        // настройки учреждения (singleton с ключом шифрования и параметрами политики).
+        public virtual DbSet<LoginAttempt> LoginAttempts { get; set; }
+        public virtual DbSet<EmployeePasswordHistory> EmployeePasswordHistories { get; set; }
+        public virtual DbSet<OrganizationSettings> OrganizationSettings { get; set; }
+
         public override int SaveChanges()
         {
             ValidateDocumentRegistrationNumbers();
@@ -494,6 +500,26 @@ namespace AhuErp.Core.Data
                 .WithMany()
                 .HasForeignKey(v => v.OrganizerId)
                 .WillCascadeOnDelete(false);
+
+            // Phase 16 / Improvement #17 + Bug #8 — журнал входов, история паролей, настройки учреждения.
+            modelBuilder.Entity<LoginAttempt>().ToTable("LoginAttempts");
+            modelBuilder.Entity<LoginAttempt>()
+                .HasOptional(a => a.Employee)
+                .WithMany()
+                .HasForeignKey(a => a.EmployeeId)
+                .WillCascadeOnDelete(false);
+
+            modelBuilder.Entity<EmployeePasswordHistory>().ToTable("EmployeePasswordHistory");
+            modelBuilder.Entity<EmployeePasswordHistory>()
+                .HasRequired(h => h.Employee)
+                .WithMany(e => e.PasswordHistory)
+                .HasForeignKey(h => h.EmployeeId)
+                .WillCascadeOnDelete(true);
+
+            modelBuilder.Entity<OrganizationSettings>().ToTable("OrganizationSettings");
+            modelBuilder.Entity<OrganizationSettings>()
+                .Property(s => s.Id)
+                .HasDatabaseGeneratedOption(System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedOption.None);
 
             base.OnModelCreating(modelBuilder);
         }

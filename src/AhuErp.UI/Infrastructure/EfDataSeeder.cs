@@ -29,6 +29,7 @@ namespace AhuErp.UI.Infrastructure
 
             EnsureAdmin(ctx, hasher);
             EnsureNomenclatureReferenceData(ctx);
+            EnsureOrganizationSettings(ctx);
         }
 
         private static void EnsureAdmin(AhuDbContext ctx, IPasswordHasher hasher)
@@ -41,6 +42,9 @@ namespace AhuErp.UI.Infrastructure
             {
                 existing.Role = EmployeeRole.Admin;
                 existing.PasswordHash = hasher.Hash(DefaultPassword);
+                // Phase 16: фиксируем дату смены пароля, чтобы первый вход
+                // не валился по PasswordExpired (90-дневный отсчёт с now).
+                existing.LastPasswordChangeAt = DateTime.UtcNow;
                 ctx.SaveChanges();
                 return;
             }
@@ -50,7 +54,32 @@ namespace AhuErp.UI.Infrastructure
                 FullName = AdminFullName,
                 Position = "Администратор информационной системы",
                 Role = EmployeeRole.Admin,
-                PasswordHash = hasher.Hash(DefaultPassword)
+                PasswordHash = hasher.Hash(DefaultPassword),
+                LastPasswordChangeAt = DateTime.UtcNow
+            });
+            ctx.SaveChanges();
+        }
+
+        /// <summary>
+        /// Phase 16: создаёт singleton-настройки учреждения с дефолтами политики
+        /// безопасности (мин 8/1 цифра/1 заглавная, 90 дней, 5 паролей в истории,
+        /// 5 неудач за 10 минут → 30 минут lockout). Шифр-ключ остаётся пустым —
+        /// его задаёт администратор через админ-панель в нужный момент.
+        /// </summary>
+        private static void EnsureOrganizationSettings(AhuDbContext ctx)
+        {
+            if (ctx.OrganizationSettings.Any()) return;
+            ctx.OrganizationSettings.Add(new OrganizationSettings
+            {
+                Id = 1,
+                EncryptionKey = null,
+                EncryptionKeyGeneratedAt = null,
+                PasswordMinLength = 8,
+                PasswordExpiryDays = 90,
+                PasswordHistoryDepth = 5,
+                LockoutFailureThreshold = 5,
+                LockoutWindowMinutes = 10,
+                LockoutDurationMinutes = 30,
             });
             ctx.SaveChanges();
         }

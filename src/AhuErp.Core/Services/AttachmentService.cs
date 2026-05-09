@@ -143,6 +143,21 @@ namespace AhuErp.Core.Services
             return _storage.Open(attachment.StoragePath);
         }
 
+        public Stream Download(int attachmentId, int downloadedById)
+        {
+            var attachment = _repository.GetById(attachmentId)
+                ?? throw new InvalidOperationException($"Вложение #{attachmentId} не найдено.");
+
+            // Phase 16 / Improvement #17 — отдельное событие для журнала аудита
+            // (отличается от AttachmentViewed: «скачал на свой диск», а не «открыл
+            // в карточке»). EntityId записываем как DocumentId, чтобы выборка
+            // «история документа» в админ-панели включала факт скачивания.
+            _audit.Record(AuditActionType.DocumentDownloaded, nameof(Document),
+                attachment.DocumentId, downloadedById,
+                details: $"attachmentId={attachment.Id}; file={attachment.FileName}");
+            return _storage.Open(attachment.StoragePath);
+        }
+
         private (string path, string hash, long size) SaveAndHash(Stream content, string registrationNumber, int version, string fileName)
         {
             // Хэшируем поток в памяти, затем перематываем для записи в хранилище;

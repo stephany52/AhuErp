@@ -28,5 +28,12 @@ namespace AhuErp.Core.Services
         IReadOnlyList<DocumentAttachment> ListVersions(int attachmentGroupId);
 
         Stream Open(int attachmentId, int viewedById);
+
+        /// <summary>
+        /// Phase 16 / Improvement #17 — выгрузка вложения на диск пользователя.
+        /// В отличие от <see cref="Open"/>, эмитит отдельное событие
+        /// <see cref="AuditActionType.DocumentDownloaded"/> для журнала аудита.
+        /// </summary>
+        Stream Download(int attachmentId, int downloadedById);
     }
 }

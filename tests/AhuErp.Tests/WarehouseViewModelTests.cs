@@ -318,6 +318,10 @@ namespace AhuErp.Tests
                 => _items.FirstOrDefault(e => string.Equals(e.FullName, fullName, StringComparison.Ordinal));
             public Employee GetById(int id) => _items.FirstOrDefault(e => e.Id == id);
             public IReadOnlyList<Employee> ListAll() => _items.AsReadOnly();
+            public void Save(Employee employee)
+            {
+                if (employee != null && !_items.Contains(employee)) _items.Add(employee);
+            }
         }
 
         private sealed class StubAuthService : IAuthService

@@ -55,6 +55,23 @@ namespace AhuErp.Core.Models
 
         UserLogin = 90,
         UserLogout = 91,
+
+        // Phase 16 / Improvement #17 — расширенный аудит безопасности.
+        LoginAttemptFailed = 92,
+        AccountLocked = 93,
+        PasswordChanged = 94,
+        PasswordExpired = 95,
+        AccountUnlocked = 96,
+        ConfidentialDocumentViewed = 97,
+
+        DocumentExportedToExcel = 100,
+        DocumentExportedToPdf = 101,
+        DocumentPrinted = 102,
+        DocumentDownloaded = 103,
+        RoleChanged = 104,
+        SubstitutionChanged = 105,
+        EncryptionKeyRotated = 106,
+
         Other = 99
     }
 }

@@ -35,6 +35,19 @@ namespace AhuErp.Core.Services
             _employees.Add(employee);
         }
 
+        public void Save(Employee employee)
+        {
+            if (employee == null) throw new ArgumentNullException(nameof(employee));
+
+            // In-memory объект уже изменён по ссылке. Если по какой-то причине
+            // вызвали Save для нового, не добавленного экземпляра, добавляем его —
+            // это симметрично EF6.SaveChanges, который трекает Added/Modified.
+            if (!_employees.Contains(employee))
+            {
+                _employees.Add(employee);
+            }
+        }
+
         public IReadOnlyList<Employee> All() => _employees.AsReadOnly();
     }
 }
