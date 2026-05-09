@@ -23,5 +23,14 @@ namespace AhuErp.Core.Services
         /// Все сотрудники (Phase 11 — для UI оргструктуры и замещений).
         /// </summary>
         IReadOnlyList<Employee> ListAll();
+
+        /// <summary>
+        /// Сохраняет изменения существующего сотрудника (Phase 16 — для
+        /// фиксирования <see cref="Employee.LockedUntil"/> и
+        /// <see cref="Employee.LastPasswordChangeAt"/> из <c>AuthService</c>).
+        /// Реализации обязаны быть идемпотентными для in-memory объекта,
+        /// уже находящегося в коллекции.
+        /// </summary>
+        void Save(Employee employee);
     }
 }

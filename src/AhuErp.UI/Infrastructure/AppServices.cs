@@ -133,6 +133,32 @@ namespace AhuErp.UI.Infrastructure
             services.AddSingleton<IItTicketDiagnosticRepository, EfItTicketDiagnosticRepository>();
             services.AddSingleton<IItServiceMetricsProvider, ItServiceMetricsProvider>();
 
+            // Phase 16 / Bug #8 + Improvement #17 — журнал входов, история паролей,
+            // парольная политика, шифрование Document.Summary, настройки учреждения.
+            services.AddSingleton<ILoginAttemptRepository, EfLoginAttemptRepository>();
+            services.AddSingleton<IEmployeePasswordHistoryRepository,
+                EfEmployeePasswordHistoryRepository>();
+            services.AddSingleton<IOrganizationSettingsRepository,
+                EfOrganizationSettingsRepository>();
+            services.AddSingleton<IPasswordPolicy>(sp => new PasswordPolicy(
+                sp.GetRequiredService<IOrganizationSettingsRepository>()));
+            services.AddSingleton<IDocumentEncryptor>(sp => new AesDocumentEncryptor(
+                sp.GetRequiredService<IOrganizationSettingsRepository>()));
+
+            // Перерегистрируем IAuthService с расширенным конструктором: lockout,
+            // истечение пароля, журнал попыток входа, аудит. Минимальный конструктор
+            // остаётся для тестов и прежних путей DI.
+            services.AddSingleton<IAuthService>(sp => new AuthService(
+                sp.GetRequiredService<IEmployeeRepository>(),
+                sp.GetRequiredService<IPasswordHasher>(),
+                sp.GetRequiredService<ILoginAttemptRepository>(),
+                sp.GetRequiredService<IEmployeePasswordHistoryRepository>(),
+                sp.GetRequiredService<IPasswordPolicy>(),
+                sp.GetRequiredService<IOrganizationSettingsRepository>(),
+                sp.GetRequiredService<IAuditService>(),
+                now: () => DateTime.UtcNow,
+                ipProvider: () => "127.0.0.1"));
+
             services.AddSingleton<IReportService>(sp => new ReportService(
                 sp.GetRequiredService<IInventoryRepository>(),
                 sp.GetRequiredService<IDocumentRepository>(),

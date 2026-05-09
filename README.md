@@ -121,6 +121,7 @@ AhuErp.sln
 | 12    | Регламентные отчёты + локализация UI                | Отчёты в XLSX / DOCX / PDF, русские подписи всех enum в UI и отчётах, `EnumDisplayConverter` |
 | 13    | Жизненный цикл документа по гос-делопроизводству     | `DocumentStatus` расширен до 11 значений (`Draft/Registered/OnApproval/Approved/Rejected/OnSigning/Signed/OnExecution/Completed/Cancelled/Archived`); `DocumentStateMachine.CanTransition(from,to[,role])` со «строгой» матрицей переходов и ролевыми ограничениями (Admin может всё валидное по графу; передача в архив — только Archivist/Manager/DeputyHead); `DocumentStateMachine.Transition` атомарно меняет статус и пишет `AuditActionType.StatusChanged`; интеграция в `NomenclatureService.Register` (Draft→Registered), `ApprovalService.StartApproval` (→OnApproval) и `ApplyDecision` (→Approved/Rejected), `SignatureService.Sign(Qualified)` (→Signed); `DocumentFilter.DocumentStatusFacet` дополнен `Rejected/OnSigning/Signed/Archived`; русская локализация новых статусов в `EnumDisplayConverter` |
 | 14    | Расширение модуля ИТО (системный администратор)      | Каталог `Equipment` (инв. №, тип/статус/MAC/IP/кабинет/ответственный/гарантия), справочник `NetworkSegment` (VLAN/диапазон/маска/шлюз/DNS), журнал `VideoConference` (тема/площадка Zoom/Jitsi/RegionalVks/ссылка/организатор/участники), хронологический `ItTicketDiagnosticEntry`, расширение `ItTicket` (`Kind`, `AffectedEquipmentId` FK, `IsSentToVendor` + поставщик/№ заявки/срок возврата, `CompletedAt`); KPI-плитки на дашборде ИТО (`IItServiceMetricsProvider`: Open/InProgress/Overdue/SentToVendor/CompletedCount/MTTR); миграция `AddItoExpansionPhase14` (4 новые таблицы + 6 колонок к `Documents`) |
+| 16    | Безопасность и админ-панель (Bug #8 + Improvement #17) | Парольная политика `IPasswordPolicy` (мин 8 / 1 цифра / 1 заглавная / 1 строчная, 90-дневный срок действия, история последних 5 паролей), `LoginAttempt` (журнал входов с IP, временем, причиной отказа), lockout 5 неудач за 10 минут → блокировка на 30 минут (`Employee.LockedUntil`), AES-256-CBC + HMAC-SHA256 шифрование чувствительных полей через `IDocumentEncryptor` / `AesDocumentEncryptor` (формат `enc:v1:<base64>`), singleton `OrganizationSettings` с настраиваемыми порогами и шифр-ключом, расширенные действия в `AuditActionType` (`LoginAttemptFailed`/`AccountLocked`/`PasswordChanged`/`PasswordExpired`/`AccountUnlocked`/`ConfidentialDocumentViewed`/`DocumentExportedToExcel`/`DocumentExportedToPdf`/`DocumentPrinted`/`DocumentDownloaded`/`RoleChanged`/`SubstitutionChanged`/`EncryptionKeyRotated`), `AttachmentService.Download` с явным `DocumentDownloaded` audit, миграция `AddSecurityAndAdminPhase16` (3 новые таблицы + 2 колонки в `Employees`) |
 
 Дополнительная миграция `AddInventoryItemUnitAndMinimumBalance` добавляет
 поля единиц измерения и минимального остатка к `InventoryItem`.
@@ -237,6 +238,116 @@ Draft (New) ───┬──► Registered ──┬──► OnApproval ─�
 
 **RBAC:** доступ к разделу «ИТО» — `Admin / Manager / TechSupport /
 DeputyHead` (без изменений в политике, расширение существующего раздела).
+
+### Phase 16 — безопасность и админ-панель (Bug #8 + Improvement #17)
+
+Закрывает требование «полный AuditLog + парольная политика + журнал
+входов + шифрование чувствительных полей» из акта приёмки. Введены
+доменные сервисы и хранилища для админ-панели; UI самой панели вынесен в
+follow-up — backend полностью готов и покрыт юнит-тестами.
+
+**Парольная политика (`IPasswordPolicy` → `PasswordPolicy`):**
+- Минимальная длина 8 символов (настраивается через
+  `OrganizationSettings.PasswordMinLength`).
+- Хотя бы одна цифра, одна заглавная и одна строчная буква.
+- Срок действия 90 дней (`OrganizationSettings.PasswordExpiryDays`),
+  по истечении — отказ во входе с `LoginFailureReason.PasswordExpired`.
+- История последних 5 паролей (`PasswordHistoryDepth`) — повторное
+  использование запрещено через `ValidateAgainstHistory(...)`.
+- При смене пароля старый хэш пишется в `EmployeePasswordHistories`,
+  лишние записи усекаются `TrimToDepth`.
+
+**Журнал входов и lockout (`LoginAttempt` + `AuthService`):**
+- Каждая попытка логина пишется в `LoginAttempts` с полями
+  `EmployeeId / Timestamp / IpAddress / Success /
+  FailureReason` (`AccountLocked / AccountInactive / WrongPassword /
+  PasswordExpired / UnknownUser / NoPasswordSet`).
+- При 5 неудачах за 10 минут (`LockoutFailureThreshold` /
+  `LockoutWindowMinutes`) — `Employee.LockedUntil =
+  now + LockoutDurationMinutes` (по умолчанию 30 минут) и аудит
+  `AccountLocked`.
+- Истёкшая блокировка автоматически снимается при следующем успешном
+  входе.
+- IP-адрес берётся из `AuthService.ipProvider`-делегата, чтобы UI и
+  тесты могли подменять источник (без хардкода `Environment.MachineName`).
+
+**Шифрование чувствительных полей (`IDocumentEncryptor` →
+`AesDocumentEncryptor`):**
+- Алгоритм: AES-256-CBC + HMAC-SHA256 (encrypt-then-MAC).
+- 32-байтный мастер-ключ хранится в `OrganizationSettings.EncryptionKey`
+  (base64); из него HKDF-подобной схемой
+  (`SHA-256(master || label)`) выводятся отдельные ключи для AES и
+  HMAC, чтобы один ключ не использовался под две операции.
+- Формат шифротекста: `enc:v1:<base64(iv|cipher|hmac)>` —
+  `IsEncryptedPayload` отличает зашифрованные значения от legacy
+  plaintext, что нужно для миграции существующих `Document.Summary` без
+  единомоментного rewrite.
+- `RotateKey()` генерирует новый 32-байтный ключ через
+  `RandomNumberGenerator`, сохраняет его и `EncryptionKeyGeneratedAt`,
+  пишет аудит `EncryptionKeyRotated` (вызывается из админ-панели).
+- Если ключ не сконфигурирован (`IsEnabled == false`) — `Encrypt`
+  возвращает plaintext без префикса, чтобы инсталляции без
+  криптографии продолжали работать; `Decrypt` без ключа на уже
+  зашифрованном payload бросает `CryptographicException`.
+
+**Расширение `AuditActionType`:**
+- Новые значения: `LoginAttemptFailed` / `AccountLocked` /
+  `AccountUnlocked` / `PasswordChanged` / `PasswordExpired` /
+  `EncryptionKeyRotated` / `ConfidentialDocumentViewed` /
+  `DocumentExportedToExcel` / `DocumentExportedToPdf` /
+  `DocumentPrinted` / `DocumentDownloaded` / `RoleChanged` /
+  `SubstitutionChanged`. Все пишутся в общий `AuditLog` с
+  hash-цепочкой целостности (Phase 7).
+- `AttachmentService.Download(attachmentId, downloadedById)` — отдельная
+  ветка для «скачал на диск» против существующего `AttachmentViewed`
+  («открыл в карточке»), пишет `DocumentDownloaded` с `EntityId =
+  DocumentId` чтобы выборка «история документа» в админ-панели
+  включала факт скачивания.
+- `ReportService.ExportInventoryToExcel` /
+  `GenerateArchiveCertificate` (DOCX→PDF) /
+  `ExportRegistrationJournal` пишут `DocumentExportedToExcel` /
+  `DocumentExportedToPdf` с именем выгруженного файла и количеством
+  строк.
+
+**Singleton `OrganizationSettings`:**
+- Одна строка (Id=1), seed создаётся `EfDataSeeder.EnsureOrganizationSettings`.
+- Поля: `EncryptionKey`, `EncryptionKeyGeneratedAt`,
+  `PasswordMinLength`, `PasswordExpiryDays`, `PasswordHistoryDepth`,
+  `LockoutFailureThreshold`, `LockoutWindowMinutes`,
+  `LockoutDurationMinutes`. Любое поле админ-панель может изменить, но
+  ключ шифрования меняется только через `IDocumentEncryptor.RotateKey`.
+
+**Расширение `Employee`:**
+- `LastPasswordChangeAt` (DateTime?) — момент последней смены пароля,
+  используется для проверки 90-дневного срока. Seed выставляет
+  `DateTime.UtcNow` для админа, чтобы первый вход не упирался в
+  `PasswordExpired`.
+- `LockedUntil` (DateTime?) — UTC-метка, до которой аккаунт заблокирован.
+  `null` или `<= now` означает «разблокирован».
+
+**Миграция `AddSecurityAndAdminPhase16`:**
+- Создаёт таблицы `LoginAttempts`, `EmployeePasswordHistories`,
+  `OrganizationSettings`.
+- Добавляет в `Employees` колонки `LastPasswordChangeAt`, `LockedUntil`.
+- FK `LoginAttempts.EmployeeId → Employees(Id)` и
+  `EmployeePasswordHistories.EmployeeId → Employees(Id)` с `ON DELETE
+  CASCADE` (история и попытки уезжают вместе с сотрудником).
+
+**RBAC:** админ-панель доступна только `Admin`. Остальные роли видят
+свой список последних входов (без чужих) — это будет реализовано в
+follow-up вместе с UI.
+
+**Что вынесено в follow-up:**
+- `AdminViewModel` + `AdminView` (WPF UI с вкладками «Пользователи»,
+  «Журнал входов», «Журнал аудита», «Организация»).
+- Хук в `DocumentService` на `Encrypt`/`Decrypt` `Document.Summary` при
+  `AccessLevel = Confidential` (инфраструктура `AesDocumentEncryptor`
+  уже готова и покрыта тестами).
+- Дополнительные audit-хуки на `DocumentPrinted`,
+  `ConfidentialDocumentViewed`, `RoleChanged`, `SubstitutionChanged`
+  (точки вызова в `DocumentService` / `EmployeeService` /
+  `SubstitutionService`). Сами `AuditActionType`-значения уже добавлены
+  и доступны для использования.
 
 ---
 

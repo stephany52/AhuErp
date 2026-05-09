@@ -103,6 +103,10 @@ namespace AhuErp.Core.Services
 
                 workbook.SaveAs(filePath);
             }
+
+            _audit?.Record(AuditActionType.DocumentExportedToExcel,
+                entityType: "InventoryReport", entityId: null, userId: null,
+                details: System.IO.Path.GetFileName(filePath));
         }
 
         public void GenerateArchiveCertificate(int archiveRequestId, string filePath)
@@ -158,6 +162,10 @@ namespace AhuErp.Core.Services
 
                 main.Document.Save();
             }
+
+            _audit?.Record(AuditActionType.DocumentExportedToPdf,
+                entityType: nameof(ArchiveRequest), entityId: archiveRequestId, userId: null,
+                details: $"docx={System.IO.Path.GetFileName(filePath)}");
         }
 
         public void ExportRegistrationJournal(IEnumerable<Document> documents, string title, string filePath)
@@ -214,6 +222,10 @@ namespace AhuErp.Core.Services
                 sheet.Column(5).Width = Math.Min(60, sheet.Column(5).Width);
                 workbook.SaveAs(filePath);
             }
+
+            _audit?.Record(AuditActionType.DocumentExportedToExcel,
+                entityType: "RegistrationJournal", entityId: null, userId: null,
+                details: $"{title}; rows={rows.Count}");
         }
 
         public void ExportExecutionDisciplineReport(DateTime from, DateTime to, string filePath)

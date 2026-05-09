@@ -631,7 +631,94 @@ BEGIN
 END
 GO
 
-/* ---------- 19. (необязательно) лёгкий сид-набор для проверки ------------- */
+/* ---------- 19. Phase 16 — Security & Admin -------------------------------- */
+/* Колонки на Employees для срока действия пароля и lockout. */
+IF COL_LENGTH(N'dbo.Employees', N'LastPasswordChangeAt') IS NULL
+BEGIN
+    ALTER TABLE dbo.Employees ADD LastPasswordChangeAt DATETIME NULL;
+END
+GO
+
+IF COL_LENGTH(N'dbo.Employees', N'LockedUntil') IS NULL
+BEGIN
+    ALTER TABLE dbo.Employees ADD LockedUntil DATETIME NULL;
+END
+GO
+
+/* OrganizationSettings — singleton (Id = 1, без IDENTITY: EF6-конфигурация
+   использует DatabaseGeneratedOption.None, INSERT идёт с явным Id=1). */
+IF OBJECT_ID(N'dbo.OrganizationSettings', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.OrganizationSettings
+    (
+        Id                          INT             NOT NULL,
+        EncryptionKey               NVARCHAR(512)   NULL,
+        EncryptionKeyGeneratedAt    DATETIME        NULL,
+        PasswordMinLength           INT             NOT NULL CONSTRAINT DF_OrgSettings_PwdMinLen          DEFAULT (8),
+        PasswordExpiryDays          INT             NOT NULL CONSTRAINT DF_OrgSettings_PwdExpiryDays      DEFAULT (90),
+        PasswordHistoryDepth        INT             NOT NULL CONSTRAINT DF_OrgSettings_PwdHistoryDepth    DEFAULT (5),
+        LockoutFailureThreshold     INT             NOT NULL CONSTRAINT DF_OrgSettings_LockoutThreshold   DEFAULT (5),
+        LockoutWindowMinutes        INT             NOT NULL CONSTRAINT DF_OrgSettings_LockoutWindow      DEFAULT (10),
+        LockoutDurationMinutes      INT             NOT NULL CONSTRAINT DF_OrgSettings_LockoutDuration    DEFAULT (30),
+        CONSTRAINT PK_dbo_OrganizationSettings PRIMARY KEY CLUSTERED (Id ASC)
+    );
+END
+GO
+
+/* EmployeePasswordHistories — последние N паролей для запрета повторного использования. */
+IF OBJECT_ID(N'dbo.EmployeePasswordHistories', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.EmployeePasswordHistories
+    (
+        Id            INT             IDENTITY(1, 1) NOT NULL,
+        EmployeeId    INT             NOT NULL,
+        PasswordHash  NVARCHAR(512)   NOT NULL,
+        SetAt         DATETIME        NOT NULL,
+        CONSTRAINT PK_dbo_EmployeePasswordHistories PRIMARY KEY CLUSTERED (Id ASC),
+        CONSTRAINT [FK_dbo.EmployeePasswordHistories_dbo.Employees_EmployeeId]
+            FOREIGN KEY (EmployeeId) REFERENCES dbo.Employees (Id) ON DELETE CASCADE
+    );
+    CREATE NONCLUSTERED INDEX IX_EmployeePasswordHistories_EmployeeId ON dbo.EmployeePasswordHistories (EmployeeId);
+    CREATE NONCLUSTERED INDEX IX_EmployeePasswordHistories_SetAt      ON dbo.EmployeePasswordHistories (SetAt DESC);
+END
+GO
+
+/* LoginAttempts — журнал попыток входа (success/failure + причина + IP).
+   Колонка AttemptedFullName хранит ФИО, под которым была попытка входа,
+   и совпадает по имени со свойством LoginAttempt.AttemptedFullName в EF. */
+IF OBJECT_ID(N'dbo.LoginAttempts', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.LoginAttempts
+    (
+        Id                INT             IDENTITY(1, 1) NOT NULL,
+        EmployeeId        INT             NULL,
+        AttemptedFullName NVARCHAR(256)   NULL,
+        Timestamp         DATETIME        NOT NULL,
+        IpAddress         NVARCHAR(64)    NULL,
+        Success           BIT             NOT NULL CONSTRAINT DF_LoginAttempts_Success DEFAULT (0),
+        FailureReason     INT             NOT NULL CONSTRAINT DF_LoginAttempts_FailureReason DEFAULT (0),
+        CONSTRAINT PK_dbo_LoginAttempts PRIMARY KEY CLUSTERED (Id ASC),
+        CONSTRAINT [FK_dbo.LoginAttempts_dbo.Employees_EmployeeId]
+            FOREIGN KEY (EmployeeId) REFERENCES dbo.Employees (Id) ON DELETE CASCADE
+    );
+    CREATE NONCLUSTERED INDEX IX_LoginAttempts_EmployeeId ON dbo.LoginAttempts (EmployeeId);
+    CREATE NONCLUSTERED INDEX IX_LoginAttempts_Timestamp  ON dbo.LoginAttempts (Timestamp DESC);
+END
+GO
+
+/* Seed singleton OrganizationSettings c дефолтами политики безопасности. */
+IF NOT EXISTS (SELECT 1 FROM dbo.OrganizationSettings)
+BEGIN
+    INSERT INTO dbo.OrganizationSettings
+        (EncryptionKey, EncryptionKeyGeneratedAt,
+         PasswordMinLength, PasswordExpiryDays, PasswordHistoryDepth,
+         LockoutFailureThreshold, LockoutWindowMinutes, LockoutDurationMinutes)
+    VALUES
+        (NULL, NULL, 8, 90, 5, 5, 10, 30);
+END
+GO
+
+/* ---------- 20. (необязательно) лёгкий сид-набор для проверки ------------- */
 /* Расскоментируй блок ниже, если хочешь сразу получить несколько строк.
  * Пароль 'password' берётся из DemoDataSeeder; реальный хеш выставляет
  * приложение при первом запуске — здесь оставляем PasswordHash = NULL,

@@ -10,7 +10,12 @@ namespace AhuErp.Core.Services
         None,
         EmptyInput,
         UserNotFound,
-        WrongPassword
+        WrongPassword,
+
+        // Phase 16 / Improvement #17.
+        AccountLocked,
+        AccountInactive,
+        PasswordExpired
     }
 
     /// <summary>
