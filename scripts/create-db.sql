@@ -196,7 +196,7 @@ IF COL_LENGTH(N'dbo.Vehicles', N'FuelType') IS NULL
 BEGIN
     ALTER TABLE dbo.Vehicles
         ADD FuelType                 INT             NOT NULL CONSTRAINT DF_Vehicles_FuelType DEFAULT (0),
-            FuelConsumptionPer100Km  DECIMAL(18, 2)  NOT NULL CONSTRAINT DF_Vehicles_FuelConsumptionPer100Km DEFAULT (0);
+            FuelConsumptionPer100Km  DECIMAL(7, 2)   NOT NULL CONSTRAINT DF_Vehicles_FuelConsumptionPer100Km DEFAULT (0);
 END
 GO
 
