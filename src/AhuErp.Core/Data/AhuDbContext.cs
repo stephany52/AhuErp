@@ -85,6 +85,12 @@ namespace AhuErp.Core.Data
         public virtual DbSet<EmployeePasswordHistory> EmployeePasswordHistories { get; set; }
         public virtual DbSet<OrganizationSettings> OrganizationSettings { get; set; }
 
+        // Phase 18 / Improvement #15 — эксплуатация зданий и реестр основных средств.
+        public virtual DbSet<Building> Buildings { get; set; }
+        public virtual DbSet<Room> Rooms { get; set; }
+        public virtual DbSet<MaintenanceRequest> MaintenanceRequests { get; set; }
+        public virtual DbSet<FixedAsset> FixedAssets { get; set; }
+
         public override int SaveChanges()
         {
             ValidateDocumentRegistrationNumbers();
@@ -601,6 +607,87 @@ namespace AhuErp.Core.Data
             modelBuilder.Entity<OrganizationSettings>()
                 .Property(s => s.Id)
                 .HasDatabaseGeneratedOption(System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedOption.None);
+
+            // ---- Phase 18 / Improvement #15 — здания, помещения, заявки, основные средства. ----
+            modelBuilder.Entity<Building>().ToTable("Buildings");
+            modelBuilder.Entity<Building>()
+                .Property(b => b.TotalAreaSqm)
+                .HasPrecision(10, 2);
+            modelBuilder.Entity<Building>()
+                .HasOptional(b => b.ResponsibleEmployee)
+                .WithMany()
+                .HasForeignKey(b => b.ResponsibleEmployeeId)
+                .WillCascadeOnDelete(false);
+
+            modelBuilder.Entity<Room>().ToTable("Rooms");
+            modelBuilder.Entity<Room>()
+                .Property(r => r.AreaSqm)
+                .HasPrecision(10, 2);
+            modelBuilder.Entity<Room>()
+                .HasRequired(r => r.Building)
+                .WithMany(b => b.Rooms)
+                .HasForeignKey(r => r.BuildingId)
+                .WillCascadeOnDelete(true);
+            modelBuilder.Entity<Room>()
+                .HasOptional(r => r.ResponsibleEmployee)
+                .WithMany()
+                .HasForeignKey(r => r.ResponsibleEmployeeId)
+                .WillCascadeOnDelete(false);
+
+            modelBuilder.Entity<MaintenanceRequest>().ToTable("MaintenanceRequests");
+            modelBuilder.Entity<MaintenanceRequest>()
+                .HasRequired(r => r.Building)
+                .WithMany()
+                .HasForeignKey(r => r.BuildingId)
+                .WillCascadeOnDelete(false);
+            modelBuilder.Entity<MaintenanceRequest>()
+                .HasOptional(r => r.Room)
+                .WithMany()
+                .HasForeignKey(r => r.RoomId)
+                .WillCascadeOnDelete(false);
+            modelBuilder.Entity<MaintenanceRequest>()
+                .HasRequired(r => r.RequesterEmployee)
+                .WithMany()
+                .HasForeignKey(r => r.RequesterEmployeeId)
+                .WillCascadeOnDelete(false);
+            modelBuilder.Entity<MaintenanceRequest>()
+                .HasOptional(r => r.AssigneeEmployee)
+                .WithMany()
+                .HasForeignKey(r => r.AssigneeEmployeeId)
+                .WillCascadeOnDelete(false);
+            modelBuilder.Entity<MaintenanceRequest>()
+                .HasOptional(r => r.LinkedDocument)
+                .WithMany()
+                .HasForeignKey(r => r.LinkedDocumentId)
+                .WillCascadeOnDelete(false);
+
+            modelBuilder.Entity<FixedAsset>().ToTable("FixedAssets");
+            modelBuilder.Entity<FixedAsset>()
+                .Property(a => a.AcquisitionCost)
+                .HasPrecision(18, 2);
+            modelBuilder.Entity<FixedAsset>()
+                .Property(a => a.BookValue)
+                .HasPrecision(18, 2);
+            modelBuilder.Entity<FixedAsset>()
+                .HasOptional(a => a.Building)
+                .WithMany()
+                .HasForeignKey(a => a.BuildingId)
+                .WillCascadeOnDelete(false);
+            modelBuilder.Entity<FixedAsset>()
+                .HasOptional(a => a.Room)
+                .WithMany()
+                .HasForeignKey(a => a.RoomId)
+                .WillCascadeOnDelete(false);
+            modelBuilder.Entity<FixedAsset>()
+                .HasOptional(a => a.ResponsibleEmployee)
+                .WithMany()
+                .HasForeignKey(a => a.ResponsibleEmployeeId)
+                .WillCascadeOnDelete(false);
+            modelBuilder.Entity<FixedAsset>()
+                .HasOptional(a => a.DecommissionDocument)
+                .WithMany()
+                .HasForeignKey(a => a.DecommissionDocumentId)
+                .WillCascadeOnDelete(false);
 
             base.OnModelCreating(modelBuilder);
         }
