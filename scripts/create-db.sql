@@ -200,6 +200,21 @@ BEGIN
 END
 GO
 
+/* ---------- 3b. Vehicles: ОСАГО / ТО / путевой лист (Phase 17 / Improvement #14) - */
+IF COL_LENGTH(N'dbo.Vehicles', N'VehicleClass') IS NULL
+BEGIN
+    ALTER TABLE dbo.Vehicles
+        ADD VehicleClass             INT             NOT NULL CONSTRAINT DF_Vehicles_VehicleClass DEFAULT (0),
+            Make                     NVARCHAR(64)    NULL,
+            [Year]                   INT             NOT NULL CONSTRAINT DF_Vehicles_Year DEFAULT (0),
+            Vin                      NVARCHAR(32)    NULL,
+            OdometerCurrent          INT             NULL,
+            NextMaintenanceOdometer  INT             NULL,
+            OsagoExpiry              DATETIME        NULL,
+            TechInspectionExpiry     DATETIME        NULL;
+END
+GO
+
 /* ---------- 4. VehicleTrips ------------------------------------------------ */
 IF OBJECT_ID(N'dbo.VehicleTrips', N'U') IS NULL
 BEGIN

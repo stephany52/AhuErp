@@ -1137,6 +1137,171 @@ namespace AhuErp.Core.Services
             ExportRegistrationJournal(contracts, $"Журнал договоров за {from:dd.MM.yyyy} — {to:dd.MM.yyyy}", filePath);
         }
 
+        // ================================================================
+        // Phase 17 / Improvement #14 — печать путевого листа (форма №3 / №4-С).
+        // ================================================================
+
+        public void GenerateTripWaybill(int tripId, string filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath))
+                throw new ArgumentException("Путь к файлу обязателен.", nameof(filePath));
+            if (_vehicles == null)
+                throw new InvalidOperationException("IVehicleRepository не зарегистрирован.");
+
+            var trip = _vehicles.GetTrip(tripId)
+                ?? throw new InvalidOperationException($"Поездка #{tripId} не найдена.");
+
+            var vehicle = trip.Vehicle ?? _vehicles.GetVehicle(trip.VehicleId)
+                ?? throw new InvalidOperationException(
+                    $"Транспортное средство #{trip.VehicleId} для поездки #{tripId} не найдено.");
+
+            var formCode = GetWaybillFormCode(vehicle.VehicleClass);
+            var formTitle = GetWaybillTitle(vehicle.VehicleClass);
+
+            using (var doc = WordprocessingDocument.Create(filePath, WordprocessingDocumentType.Document))
+            {
+                var main = doc.AddMainDocumentPart();
+                main.Document = new W.Document(new W.Body());
+                var body = main.Document.Body;
+
+                body.AppendChild(Paragraph(OrganizationProfile.FullName));
+                body.AppendChild(Paragraph(string.Empty));
+                body.AppendChild(Heading(formTitle));
+                if (!string.IsNullOrEmpty(formCode))
+                {
+                    body.AppendChild(Paragraph(formCode));
+                }
+                body.AppendChild(Paragraph(
+                    $"№ {trip.Id:D6} от {(trip.ActualStart ?? trip.StartDate):dd.MM.yyyy}"));
+                body.AppendChild(Paragraph(string.Empty));
+
+                body.AppendChild(Heading("1. СВЕДЕНИЯ ОБ АВТОМОБИЛЕ"));
+                body.AppendChild(Paragraph($"Марка: {NullSafe(vehicle.Make)}"));
+                body.AppendChild(Paragraph($"Модель: {NullSafe(vehicle.Model)}"));
+                body.AppendChild(Paragraph($"Гос. номер: {NullSafe(vehicle.LicensePlate)}"));
+                body.AppendChild(Paragraph($"Год выпуска: {(vehicle.Year > 0 ? vehicle.Year.ToString() : "—")}"));
+                body.AppendChild(Paragraph($"VIN: {NullSafe(vehicle.Vin)}"));
+                body.AppendChild(Paragraph($"Категория ТС: {FormatVehicleClass(vehicle.VehicleClass)}"));
+                body.AppendChild(Paragraph($"Тип топлива: {FormatFuelType(vehicle.FuelType)}"));
+                body.AppendChild(Paragraph(
+                    $"Норма расхода: {vehicle.FuelConsumptionPer100Km.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)} л/100 км"));
+                body.AppendChild(Paragraph(string.Empty));
+
+                body.AppendChild(Heading("2. ВОДИТЕЛЬ"));
+                body.AppendChild(Paragraph($"ФИО: {NullSafe(trip.DriverName)}"));
+                body.AppendChild(Paragraph(string.Empty));
+
+                body.AppendChild(Heading("3. ЗАДАНИЕ"));
+                body.AppendChild(Paragraph($"Маршрут: {NullSafe(trip.Route)}"));
+                body.AppendChild(Paragraph(
+                    $"Плановое время: {trip.StartDate:dd.MM.yyyy HH:mm} — {trip.EndDate:dd.MM.yyyy HH:mm}"));
+
+                if (vehicle.VehicleClass == VehicleClass.Passenger
+                    && !string.IsNullOrWhiteSpace(trip.PassengerNames))
+                {
+                    body.AppendChild(Paragraph($"Пассажиры (служебная перевозка): {trip.PassengerNames}"));
+                }
+
+                body.AppendChild(Paragraph(string.Empty));
+
+                body.AppendChild(Heading("4. РАБОТА АВТОМОБИЛЯ"));
+                body.AppendChild(Paragraph(
+                    $"Фактический выезд: {(trip.ActualStart.HasValue ? trip.ActualStart.Value.ToString("dd.MM.yyyy HH:mm") : "—")}"));
+                body.AppendChild(Paragraph(
+                    $"Фактическое возвращение: {(trip.ActualEnd.HasValue ? trip.ActualEnd.Value.ToString("dd.MM.yyyy HH:mm") : "—")}"));
+                body.AppendChild(Paragraph(
+                    $"Одометр (выезд): {(trip.OdometerStart.HasValue ? trip.OdometerStart.Value.ToString() : "—")} км"));
+                body.AppendChild(Paragraph(
+                    $"Одометр (возвращение): {(trip.OdometerEnd.HasValue ? trip.OdometerEnd.Value.ToString() : "—")} км"));
+                body.AppendChild(Paragraph(
+                    $"Пройдено: {(trip.DistanceKm.HasValue ? trip.DistanceKm.Value.ToString() : "—")} км"));
+                body.AppendChild(Paragraph(string.Empty));
+
+                body.AppendChild(Heading("5. ГОРЮЧЕ-СМАЗОЧНЫЕ МАТЕРИАЛЫ"));
+                body.AppendChild(Paragraph($"Выдано топлива: {FormatLiters(trip.FuelIssuedLiters)} л"));
+                body.AppendChild(Paragraph($"Расход по норме: {FormatLiters(trip.FuelUsedLiters)} л"));
+                body.AppendChild(Paragraph(string.Empty));
+
+                if (vehicle.VehicleClass == VehicleClass.Truck)
+                {
+                    body.AppendChild(Heading("6. ВЫПОЛНЕНИЕ ЗАДАНИЯ (для грузового ТС)"));
+                    body.AppendChild(Paragraph("Заказчик / грузоотправитель: ____________________________________"));
+                    body.AppendChild(Paragraph("Пункт погрузки: __________________________________________________"));
+                    body.AppendChild(Paragraph("Пункт разгрузки: _________________________________________________"));
+                    body.AppendChild(Paragraph("Наименование груза: ______________________________________________"));
+                    body.AppendChild(Paragraph("Количество ездок с грузом: _______________________________________"));
+                    body.AppendChild(Paragraph("Масса перевезённого груза (т): ___________________________________"));
+                    body.AppendChild(Paragraph(string.Empty));
+                }
+
+                body.AppendChild(Heading("ПОДПИСИ"));
+                body.AppendChild(Paragraph("Диспетчер: ______________________________________"));
+                body.AppendChild(Paragraph("Механик (выезд / возвращение): __________________ / __________________"));
+                body.AppendChild(Paragraph("Водитель: _______________________________________"));
+
+                main.Document.Save();
+            }
+
+            _audit?.Record(AuditActionType.DocumentExportedToPdf,
+                entityType: nameof(VehicleTrip), entityId: tripId, userId: null,
+                details: $"docx={System.IO.Path.GetFileName(filePath)};form={formCode}");
+        }
+
+        private static string GetWaybillTitle(VehicleClass vehicleClass)
+        {
+            switch (vehicleClass)
+            {
+                case VehicleClass.Passenger:
+                    return "ПУТЕВОЙ ЛИСТ ЛЕГКОВОГО АВТОМОБИЛЯ";
+                case VehicleClass.Truck:
+                    return "ПУТЕВОЙ ЛИСТ ГРУЗОВОГО АВТОМОБИЛЯ (СДЕЛЬНАЯ)";
+                case VehicleClass.Bus:
+                    return "ПУТЕВОЙ ЛИСТ АВТОБУСА НЕОБЩЕГО ПОЛЬЗОВАНИЯ";
+                case VehicleClass.Special:
+                    return "ПУТЕВОЙ ЛИСТ СПЕЦИАЛЬНОГО АВТОМОБИЛЯ";
+                default:
+                    return "ПУТЕВОЙ ЛИСТ";
+            }
+        }
+
+        private static string GetWaybillFormCode(VehicleClass vehicleClass)
+        {
+            switch (vehicleClass)
+            {
+                case VehicleClass.Passenger:
+                    return "Форма №3 (Постановление Госкомстата от 28.11.1997 №78)";
+                case VehicleClass.Truck:
+                    return "Форма №4-С (Постановление Госкомстата от 28.11.1997 №78)";
+                case VehicleClass.Bus:
+                    return "Форма №6 / №6-СПЕЦ";
+                case VehicleClass.Special:
+                    return "Форма №3-СПЕЦ";
+                default:
+                    return string.Empty;
+            }
+        }
+
+        private static string FormatVehicleClass(VehicleClass vehicleClass)
+        {
+            switch (vehicleClass)
+            {
+                case VehicleClass.Passenger: return "Легковой";
+                case VehicleClass.Truck: return "Грузовой";
+                case VehicleClass.Bus: return "Автобус";
+                case VehicleClass.Special: return "Специальный";
+                default: return vehicleClass.ToString();
+            }
+        }
+
+        private static string FormatLiters(decimal? liters)
+        {
+            if (!liters.HasValue) return "—";
+            return liters.Value.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        private static string NullSafe(string value) =>
+            string.IsNullOrWhiteSpace(value) ? "—" : value;
+
         private static string FormatFuelType(FuelType fuel)
         {
             switch (fuel)

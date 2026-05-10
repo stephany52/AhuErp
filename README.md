@@ -350,6 +350,98 @@ follow-up вместе с UI.
   `SubstitutionService`). Сами `AuditActionType`-значения уже добавлены
   и доступны для использования.
 
+### Phase 17 — паспортные данные ТС, ОСАГО / ТО, печать путевого листа (Improvement #14)
+
+Закрывает требование «эффективная организация транспортного обслуживания»
+(info.txt) поверх Phase 15 (учёт ГСМ): добавлены полные паспортные
+данные транспортного средства, контроль сроков ОСАГО / технического
+осмотра / планового ТО по пробегу и печать путевого листа по форме
+№3 (легковой) и №4-С (грузовой) согласно Постановлению Госкомстата
+от 28.11.1997 №78.
+
+**Расширение `Vehicle`:**
+- `Make` (string, 128) — производитель/марка («ГАЗ», «Toyota», «ВАЗ»).
+- `Year` (int) — год выпуска.
+- `Vin` (string, 32) — VIN-номер.
+- `OdometerCurrent` (int?) — текущий пробег в км.
+- `NextMaintenanceOdometer` (int?) — пробег планового ТО в км.
+- `OsagoExpiry` (DateTime?) — срок действия полиса ОСАГО.
+- `TechInspectionExpiry` (DateTime?) — срок диагностической карты.
+- `VehicleClass` (`VehicleClass`-enum: `Passenger / Truck / Bus /
+  Special`) — категория ТС, определяет форму путевого листа и блок
+  «выполнение задания» в DOCX.
+
+**`VehicleMaintenanceService` (`IVehicleMaintenanceService`):**
+- `CheckExpiringDocuments(now, daysAhead = 30, kmAhead = 1000)` —
+  обходит автопарк и формирует уведомления:
+  - `NotificationKind.VehicleOsagoExpiringSoon` — за 30 дней до
+    `OsagoExpiry`;
+  - `NotificationKind.VehicleTechInspectionExpiringSoon` — за 30 дней до
+    `TechInspectionExpiry`;
+  - `NotificationKind.VehicleMaintenanceDueSoon` — когда
+    `NextMaintenanceOdometer - OdometerCurrent <= kmAhead`.
+- Получатели — все `WarehouseManager / FleetManager / Admin`. Если в
+  системе нет ни одного — возвращает пустой список (не падает).
+- Идемпотентность: повторный обход в течение того же календарного дня
+  не создаёт дубликатов (проверка по `kind + LicensePlate` в
+  `Notification.Body`).
+- Типичная точка вызова — `NotificationService.TickReminders` (раз в
+  сутки из планировщика UI).
+
+**`ReportService.GenerateTripWaybill(tripId, filePath)`:**
+- Формирует DOCX-путевой лист через `DocumentFormat.OpenXml` с шапкой
+  `OrganizationProfile.FullName` и реквизитами поездки.
+- Заголовок и форма выбираются по `Vehicle.VehicleClass`:
+  - `Passenger` → «ПУТЕВОЙ ЛИСТ ЛЕГКОВОГО АВТОМОБИЛЯ» / Форма №3;
+  - `Truck` → «ПУТЕВОЙ ЛИСТ ГРУЗОВОГО АВТОМОБИЛЯ (СДЕЛЬНАЯ)» /
+    Форма №4-С — добавляется блок «ВЫПОЛНЕНИЕ ЗАДАНИЯ» с полями
+    «Заказчик / грузоотправитель», «Пункт погрузки», «Пункт разгрузки»,
+    «Наименование груза», «Количество ездок», «Масса груза»;
+  - `Bus` / `Special` — соответствующие подзаголовки.
+- Тело путевого листа: 1) сведения об автомобиле (марка / модель / гос.
+  номер / год / VIN / категория / тип топлива / норма расхода);
+  2) водитель (`DriverName`); 3) задание (маршрут и плановое время,
+  для легкового — пассажиры по `PassengerNames`); 4) работа автомобиля
+  (фактический выезд/возврат, одометр старт/финиш, пройдено км);
+  5) ГСМ (выдано / расход по норме); 6) для `Truck` — выполнение
+  задания; 7) подписи (диспетчер / механик / водитель).
+- Все недостающие значения подменяются «—», чтобы документ оставался
+  валидным даже при минимально заполненной поездке.
+- Пишет аудит `AuditActionType.DocumentExportedToPdf` с указанием
+  имени файла и кода формы.
+
+**`NotificationKind`:**
+- `VehicleOsagoExpiringSoon`, `VehicleTechInspectionExpiringSoon`,
+  `VehicleMaintenanceDueSoon` — добавлены и используются
+  `VehicleMaintenanceService`.
+
+**Миграция `AddVehicleOsagoWaybillPhase17`:**
+- Добавляет в `Vehicles` колонки `Make` (`nvarchar(128)` NULL),
+  `Year` (int NOT NULL DEFAULT 0), `Vin` (`nvarchar(32)` NULL),
+  `OdometerCurrent` (int NULL), `NextMaintenanceOdometer` (int NULL),
+  `OsagoExpiry` (datetime NULL), `TechInspectionExpiry` (datetime NULL),
+  `VehicleClass` (int NOT NULL DEFAULT 0).
+- Параллельно отражена в `scripts/create-db.sql` (для свежих
+  установок).
+
+**DI:** `IVehicleMaintenanceService` зарегистрирован singleton в
+`AppServices`. Зависимости: `IVehicleRepository`,
+`INotificationService`, `IEmployeeRepository`, `INotificationRepository`.
+
+**RBAC:** генерация путевого листа — это business-action на уровне
+`FleetService` / `WarehouseManager`. Уведомления получают только
+`WarehouseManager / FleetManager / Admin` (см. выше). UI-кнопка «Печать
+путевого листа» вынесена в follow-up — backend-сервис полностью готов
+и покрыт юнит-тестами (DOCX-вывод проверяется через
+`WordprocessingDocument.Open` + извлечение `<w:t>`).
+
+**Что вынесено в follow-up:**
+- WPF-UI: кнопка «Печать путевого листа» в `FleetView`/`VehicleTripView`,
+  карточка ТС с разделом «ОСАГО / ТО» (поля паспортных данных + дат).
+- Шедулер из `App.xaml.cs`, дёргающий
+  `IVehicleMaintenanceService.CheckExpiringDocuments(DateTime.Now)` раз
+  в сутки одновременно с `NotificationService.TickReminders`.
+
 ---
 
 ## Бизнес-инварианты (проверены тестами)
