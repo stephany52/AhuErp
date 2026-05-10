@@ -14,7 +14,7 @@ namespace AhuErp.Core.Services
     {
         Notification Create(int recipientId, NotificationKind kind, string title,
                             string body, int? docId = null, int? taskId = null,
-                            int? approvalId = null);
+                            int? approvalId = null, DateTime? createdAt = null);
 
         void MarkRead(int notificationId, int actorId);
         void MarkAllRead(int recipientId);

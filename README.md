@@ -360,7 +360,7 @@ follow-up вместе с UI.
 от 28.11.1997 №78.
 
 **Расширение `Vehicle`:**
-- `Make` (string, 128) — производитель/марка («ГАЗ», «Toyota», «ВАЗ»).
+- `Make` (string, 64) — производитель/марка («ГАЗ», «Toyota», «ВАЗ»).
 - `Year` (int) — год выпуска.
 - `Vin` (string, 32) — VIN-номер.
 - `OdometerCurrent` (int?) — текущий пробег в км.
@@ -416,7 +416,7 @@ follow-up вместе с UI.
   `VehicleMaintenanceService`.
 
 **Миграция `AddVehicleOsagoWaybillPhase17`:**
-- Добавляет в `Vehicles` колонки `Make` (`nvarchar(128)` NULL),
+- Добавляет в `Vehicles` колонки `Make` (`nvarchar(64)` NULL),
   `Year` (int NOT NULL DEFAULT 0), `Vin` (`nvarchar(32)` NULL),
   `OdometerCurrent` (int NULL), `NextMaintenanceOdometer` (int NULL),
   `OsagoExpiry` (datetime NULL), `TechInspectionExpiry` (datetime NULL),

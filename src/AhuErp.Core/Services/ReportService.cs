@@ -1242,7 +1242,7 @@ namespace AhuErp.Core.Services
                 main.Document.Save();
             }
 
-            _audit?.Record(AuditActionType.DocumentExportedToPdf,
+            _audit?.Record(AuditActionType.DocumentExportedToDocx,
                 entityType: nameof(VehicleTrip), entityId: tripId, userId: null,
                 details: $"docx={System.IO.Path.GetFileName(filePath)};form={formCode}");
         }

@@ -72,6 +72,11 @@ namespace AhuErp.Core.Models
         SubstitutionChanged = 105,
         EncryptionKeyRotated = 106,
 
+        // Phase 17 / Improvement #14 — экспорт DOCX-форм (путевой лист и
+        // другие формальные документы), отдельно от Excel/PDF, чтобы
+        // фильтры в админ-панели не объединяли разные форматы.
+        DocumentExportedToDocx = 107,
+
         Other = 99
     }
 }

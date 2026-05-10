@@ -51,7 +51,7 @@ namespace AhuErp.Core.Services
 
         public Notification Create(int recipientId, NotificationKind kind, string title,
                                    string body, int? docId = null, int? taskId = null,
-                                   int? approvalId = null)
+                                   int? approvalId = null, DateTime? createdAt = null)
         {
             if (recipientId <= 0) throw new ArgumentException("Получатель обязателен.", nameof(recipientId));
             if (string.IsNullOrWhiteSpace(title)) throw new ArgumentException("Заголовок обязателен.", nameof(title));
@@ -64,7 +64,11 @@ namespace AhuErp.Core.Services
             }
 
             var channel = pref?.Channel ?? NotificationChannel.InApp;
-            var now = DateTime.Now;
+            // CreatedAt: если вызывающий передал логическое время (например,
+            // сканер автопарка с тестовым `now`), используем его — это
+            // выравнивает дедуп по календарным дням между собственной логикой
+            // вызывающего сервиса и записанной меткой времени уведомления.
+            var now = createdAt ?? DateTime.Now;
 
             // Сохраняем запись ВСЕГДА — это нужно и для аудита, и для
             // идемпотентности TickReminders. Email-only записи помечаем как
