@@ -130,5 +130,27 @@ namespace AhuErp.Core.Services
         /// регистрационного журнала, но с заголовком «Журнал договоров».
         /// </summary>
         void ExportContractsJournal(IEnumerable<Models.Document> contracts, System.DateTime from, System.DateTime to, string filePath);
+
+        // ------------------------------------------------------------
+        // Phase 17 / Improvement #14 — печать путевого листа.
+        // ------------------------------------------------------------
+
+        /// <summary>
+        /// Генерирует Word-форму путевого листа (DOCX) для конкретной поездки.
+        /// Шапка и блок «работа автомобиля» подбираются по
+        /// <see cref="Models.Vehicle.VehicleClass"/>:
+        /// <list type="bullet">
+        ///   <item><description><see cref="Models.VehicleClass.Passenger"/> —
+        ///     форма №3 (Постановление Госкомстата от 28.11.1997 №78).</description></item>
+        ///   <item><description><see cref="Models.VehicleClass.Truck"/> —
+        ///     форма №4-С (сдельная) для повременной/сдельной перевозки.</description></item>
+        ///   <item><description>остальные классы — обобщённая шапка «Путевой лист».</description></item>
+        /// </list>
+        /// Подставляются: ФИО водителя, гос. номер / марка / VIN, маршрут,
+        /// одометр, расход топлива, фактическое время и пассажиры.
+        /// </summary>
+        /// <param name="tripId">Идентификатор <see cref="Models.VehicleTrip"/>.</param>
+        /// <param name="filePath">Путь, по которому будет записан DOCX.</param>
+        void GenerateTripWaybill(int tripId, string filePath);
     }
 }

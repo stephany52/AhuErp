@@ -174,6 +174,15 @@ namespace AhuErp.UI.Infrastructure
                 sp.GetRequiredService<IVehicleRepository>(),
                 sp.GetRequiredService<IAuditService>()));
 
+            // Phase 17 / Improvement #14 — паспортные данные ТС, ОСАГО / ТО,
+            // печать путевого листа. Сервис идемпотентно создаёт уведомления
+            // о приближающемся истечении ОСАГО / ТО и о ТО по пробегу.
+            services.AddSingleton<IVehicleMaintenanceService>(sp => new VehicleMaintenanceService(
+                sp.GetRequiredService<IVehicleRepository>(),
+                sp.GetRequiredService<INotificationService>(),
+                sp.GetRequiredService<IEmployeeRepository>(),
+                sp.GetRequiredService<INotificationRepository>()));
+
             // UI-инфраструктура
             services.AddSingleton<IFileDialogService, FileDialogService>();
             services.AddSingleton<DocumentNavigator>();
