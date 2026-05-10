@@ -86,11 +86,23 @@ namespace AhuErp.Core.Models
             }
         }
 
-        /// <summary>Пройденное расстояние по одометру (км); <c>null</c>, если показания неполные.</summary>
-        public int? DistanceKm =>
-            OdometerStart.HasValue && OdometerEnd.HasValue
-                ? OdometerEnd.Value - OdometerStart.Value
-                : (int?)null;
+        /// <summary>
+        /// Пройденное расстояние по одометру (км); <c>null</c>, если показания неполные
+        /// или конечный одометр меньше начального (некорректные данные —
+        /// возможен сброс одометра / опечатка). Поведение симметрично
+        /// <see cref="FuelUsedLiters"/>, который тоже возвращает <c>null</c>
+        /// в этой ситуации, чтобы в журнале ГСМ не появлялись отрицательные
+        /// расстояния и расходы.
+        /// </summary>
+        public int? DistanceKm
+        {
+            get
+            {
+                if (!OdometerStart.HasValue || !OdometerEnd.HasValue) return null;
+                var d = OdometerEnd.Value - OdometerStart.Value;
+                return d >= 0 ? d : (int?)null;
+            }
+        }
 
         /// <summary>
         /// Интервалы пересекаются при выполнении условия Allen-overlap: start1 &lt; end2 и start2 &lt; end1.

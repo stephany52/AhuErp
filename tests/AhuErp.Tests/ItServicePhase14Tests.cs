@@ -354,6 +354,25 @@ namespace AhuErp.Tests
         }
 
         [Fact]
+        public void Metrics_archived_status_is_terminal_and_not_counted_as_open()
+        {
+            // Phase 13 ввёл Archived как третий терминальный статус (наряду
+            // с Completed и Cancelled). Без Archived в IsTerminal заявки,
+            // ушедшие в архив, продолжали бы попадать в OpenCount, искусственно
+            // завышая нагрузку на ИТО.
+            var docs = new InMemoryDocumentRepository();
+            var asOf = new DateTime(2026, 5, 8, 12, 0, 0);
+
+            docs.Add(MakeTicket(1, DocumentStatus.InProgress, asOf));
+            docs.Add(MakeTicket(2, DocumentStatus.Archived, asOf));
+            docs.Add(MakeTicket(3, DocumentStatus.Archived, asOf));
+
+            var snapshot = new ItServiceMetricsProvider(docs).Compute(asOf);
+
+            Assert.Equal(1, snapshot.OpenCount);
+        }
+
+        [Fact]
         public void Metrics_in_progress_includes_in_progress_status_and_sent_to_vendor()
         {
             var docs = new InMemoryDocumentRepository();
