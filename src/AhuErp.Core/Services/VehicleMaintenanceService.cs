@@ -53,7 +53,7 @@ namespace AhuErp.Core.Services
                     EnqueueForAll(v, NotificationKind.VehicleOsagoExpiringSoon,
                         $"ОСАГО {v.Make} {v.Model} ({v.LicensePlate}) истекает {v.OsagoExpiry:dd.MM.yyyy}",
                         $"Срок действия ОСАГО ТС «{v.Make} {v.Model}» (гос. номер {v.LicensePlate}) истекает {v.OsagoExpiry:dd.MM.yyyy}. До истечения: {Math.Max(0, (int)Math.Ceiling((v.OsagoExpiry.Value - now).TotalDays))} дн.",
-                        recipients, created);
+                        recipients, created, now);
                 }
 
                 if (v.TechInspectionExpiry.HasValue
@@ -62,7 +62,7 @@ namespace AhuErp.Core.Services
                     EnqueueForAll(v, NotificationKind.VehicleTechInspectionExpiringSoon,
                         $"ТО {v.Make} {v.Model} ({v.LicensePlate}) истекает {v.TechInspectionExpiry:dd.MM.yyyy}",
                         $"Срок действия диагностической карты ТС «{v.Make} {v.Model}» (гос. номер {v.LicensePlate}) истекает {v.TechInspectionExpiry:dd.MM.yyyy}. До истечения: {Math.Max(0, (int)Math.Ceiling((v.TechInspectionExpiry.Value - now).TotalDays))} дн.",
-                        recipients, created);
+                        recipients, created, now);
                 }
 
                 if (v.NextMaintenanceOdometer.HasValue && v.OdometerCurrent.HasValue)
@@ -73,7 +73,7 @@ namespace AhuErp.Core.Services
                         EnqueueForAll(v, NotificationKind.VehicleMaintenanceDueSoon,
                             $"Плановое ТО {v.Make} {v.Model} ({v.LicensePlate}): осталось {remainingKm} км",
                             $"Плановое ТО ТС «{v.Make} {v.Model}» (гос. номер {v.LicensePlate}) при пробеге {v.NextMaintenanceOdometer} км. Текущий пробег: {v.OdometerCurrent} км. Осталось: {remainingKm} км.",
-                            recipients, created);
+                            recipients, created, now);
                     }
                 }
             }
@@ -84,28 +84,38 @@ namespace AhuErp.Core.Services
         private void EnqueueForAll(Vehicle vehicle, NotificationKind kind,
                                    string title, string body,
                                    IReadOnlyList<Employee> recipients,
-                                   List<Notification> created)
+                                   List<Notification> created,
+                                   DateTime now)
         {
             foreach (var r in recipients)
             {
-                if (HasRecentNotificationForVehicle(r.Id, kind, vehicle.Id)) continue;
+                if (HasRecentNotificationForVehicle(r.Id, kind, vehicle.Id, now)) continue;
 
-                var n = _notifications.Create(r.Id, kind, title, body);
+                // Передаём `now` как `createdAt`, чтобы записанная метка
+                // времени совпадала с логическим временем сканирования —
+                // дедуп по `n.CreatedAt.Date == now.Date` тогда корректен
+                // и в проде, и в юнит-тестах с подменой часов.
+                var n = _notifications.Create(r.Id, kind, title, body, createdAt: now);
                 if (n != null) created.Add(n);
             }
         }
 
         /// <summary>
-        /// Проверка идемпотентности: для одного и того же ТС за один календарный
-        /// день одинаковое уведомление повторно не создаётся. Идентификатор ТС
-        /// зашит в <see cref="Notification.Body"/> через гос. номер — этого
-        /// достаточно, т.к. одна и та же модель/гос.номер не пересекаются.
+        /// Проверка идемпотентности: для одного и того же ТС за один логический
+        /// календарный день одинаковое уведомление повторно не создаётся.
+        /// «Сегодня» определяется параметром <paramref name="now"/>, чтобы
+        /// каталог-обход и дедуп использовали единые часы — тесты могут
+        /// подменять время, а в проде планировщик передаёт <c>DateTime.Now</c>.
+        /// Идентификатор ТС зашит в <see cref="Notification.Body"/> через гос.
+        /// номер — этого достаточно, т.к. одна и та же модель/гос.номер не
+        /// пересекаются.
         /// </summary>
-        private bool HasRecentNotificationForVehicle(int recipientId, NotificationKind kind, int vehicleId)
+        private bool HasRecentNotificationForVehicle(int recipientId, NotificationKind kind,
+                                                     int vehicleId, DateTime now)
         {
             var existing = _notificationRepo.ListByRecipient(recipientId, unreadOnly: false);
             return existing.Any(n => n.Kind == kind
-                                     && n.CreatedAt.Date == DateTime.Now.Date
+                                     && n.CreatedAt.Date == now.Date
                                      && (n.Body ?? string.Empty).Contains($"гос. номер {GetVehicleNumber(vehicleId)}"));
         }
 
