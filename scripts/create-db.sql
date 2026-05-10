@@ -740,7 +740,7 @@ BEGIN
     (
         Id         INT             IDENTITY(1, 1) NOT NULL,
         TicketId   INT             NOT NULL,
-        AuthorId   INT             NULL,
+        AuthorId   INT             NOT NULL,
         Timestamp  DATETIME        NOT NULL,
         Action     NVARCHAR(1024)  NOT NULL,
         Category   NVARCHAR(128)   NULL,
@@ -765,10 +765,10 @@ BEGIN
         Topic         NVARCHAR(256)   NOT NULL,
         ScheduledAt   DATETIME        NOT NULL,
         CompletedAt   DATETIME        NULL,
-        OrganizerId   INT             NULL,
+        OrganizerId   INT             NOT NULL,
         Participants  NVARCHAR(2048)  NULL,
         Platform      INT             NOT NULL CONSTRAINT DF_VideoConferences_Platform DEFAULT (0),
-        MeetingUrl    NVARCHAR(512)   NULL,
+        MeetingUrl    NVARCHAR(1024)  NULL,
         Notes         NVARCHAR(1024)  NULL,
         TicketId      INT             NULL,
         CONSTRAINT PK_dbo_VideoConferences PRIMARY KEY CLUSTERED (Id ASC),
@@ -862,11 +862,11 @@ GO
 IF NOT EXISTS (SELECT 1 FROM dbo.OrganizationSettings)
 BEGIN
     INSERT INTO dbo.OrganizationSettings
-        (EncryptionKey, EncryptionKeyGeneratedAt,
+        (Id, EncryptionKey, EncryptionKeyGeneratedAt,
          PasswordMinLength, PasswordExpiryDays, PasswordHistoryDepth,
          LockoutFailureThreshold, LockoutWindowMinutes, LockoutDurationMinutes)
     VALUES
-        (NULL, NULL, 8, 90, 5, 5, 10, 30);
+        (1, NULL, NULL, 8, 90, 5, 5, 10, 30);
 END
 GO
 

@@ -14,7 +14,8 @@ namespace AhuErp.Core.Services
     /// <remarks>
     /// Определения:
     /// <list type="bullet">
-    /// <item>Open — заявка не в терминальном статусе (не Completed / не Cancelled).</item>
+    /// <item>Open — заявка не в терминальном статусе
+    ///   (не Completed / не Cancelled / не Archived).</item>
     /// <item>InProgress — заявка взята в работу: <see cref="DocumentStatus.InProgress"/>
     /// либо передана в сервис (флаг <see cref="ItTicket.IsSentToVendor"/>).</item>
     /// <item>Overdue — открытая заявка с дедлайном, который уже наступил.</item>
@@ -102,6 +103,7 @@ namespace AhuErp.Core.Services
 
         private static bool IsTerminal(DocumentStatus status)
             => status == DocumentStatus.Completed
-            || status == DocumentStatus.Cancelled;
+            || status == DocumentStatus.Cancelled
+            || status == DocumentStatus.Archived;
     }
 }

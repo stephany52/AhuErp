@@ -64,6 +64,17 @@ namespace AhuErp.Tests
         }
 
         [Fact]
+        public void VehicleTrip_DistanceKm_returns_null_when_end_less_than_start()
+        {
+            // Конечный одометр меньше начального — некорректные данные
+            // (сброс одометра / опечатка). Поведение симметрично
+            // FuelUsedLiters: оба возвращают null, чтобы в журнале ГСМ
+            // не появились отрицательные пробег и расход.
+            var trip = new VehicleTrip { OdometerStart = 12_500, OdometerEnd = 12_000 };
+            Assert.Null(trip.DistanceKm);
+        }
+
+        [Fact]
         public void VehicleTrip_FuelUsedLiters_uses_consumption_norm_and_distance()
         {
             var vehicle = new Vehicle { Model = "ГАЗ-3221", LicensePlate = "А001АА", FuelConsumptionPer100Km = 12m };

@@ -58,6 +58,21 @@ namespace AhuErp.UI.ViewModels
                     case LoginFailureReason.WrongPassword:
                         ErrorMessage = "Неверный пароль.";
                         break;
+                    case LoginFailureReason.AccountLocked:
+                        // Пароль может быть валидным, но порог неудачных попыток
+                        // превышен — пользователю нельзя подсказывать «правильно/неправильно»,
+                        // только сообщить о временной блокировке.
+                        ErrorMessage = "Учётная запись временно заблокирована. Попробуйте позже.";
+                        break;
+                    case LoginFailureReason.AccountInactive:
+                        ErrorMessage = "Учётная запись деактивирована. Обратитесь к администратору.";
+                        break;
+                    case LoginFailureReason.PasswordExpired:
+                        // Пароль фактически верен, но истёк срок действия — нельзя
+                        // показывать «неверный пароль», иначе пользователь начнёт
+                        // подбирать другие пароли и наберёт лимит lockout.
+                        ErrorMessage = "Срок действия пароля истёк. Обратитесь к администратору для сброса.";
+                        break;
                     default:
                         ErrorMessage = "Неверное ФИО или пароль.";
                         break;

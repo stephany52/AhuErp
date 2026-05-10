@@ -96,9 +96,13 @@ namespace AhuErp.UI.Converters
             [DocumentStatusFacet.Registered] = "Зарегистрирован",
             [DocumentStatusFacet.OnApproval] = "На согласовании",
             [DocumentStatusFacet.Approved] = "Согласован",
+            [DocumentStatusFacet.Rejected] = "Отклонён",
+            [DocumentStatusFacet.OnSigning] = "На подписании",
+            [DocumentStatusFacet.Signed] = "Подписан",
             [DocumentStatusFacet.OnExecution] = "На исполнении",
             [DocumentStatusFacet.Completed] = "Завершён",
             [DocumentStatusFacet.Cancelled] = "Отменён",
+            [DocumentStatusFacet.Archived] = "В архиве",
             [DocumentStatusFacet.Overdue] = "Просрочен",
             [DocumentStatusFacet.NotCompleted] = "Не завершён",
 
