@@ -870,7 +870,134 @@ BEGIN
 END
 GO
 
-/* ---------- 20. (необязательно) лёгкий сид-набор для проверки ------------- */
+/* ---------- 20. Phase 18 — Buildings & Maintenance ------------------------ */
+/* Buildings — здания учреждения (наименование уникально). */
+IF OBJECT_ID(N'dbo.Buildings', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.Buildings
+    (
+        Id                      INT             IDENTITY(1, 1) NOT NULL,
+        Name                    NVARCHAR(128)   NOT NULL,
+        Address                 NVARCHAR(256)   NULL,
+        TotalAreaSqm            DECIMAL(10, 2)  NOT NULL CONSTRAINT DF_Buildings_TotalAreaSqm     DEFAULT (0),
+        FloorCount              INT             NOT NULL CONSTRAINT DF_Buildings_FloorCount       DEFAULT (0),
+        CommissionedYear        INT             NOT NULL CONSTRAINT DF_Buildings_CommissionedYear DEFAULT (0),
+        ResponsibleEmployeeId   INT             NULL,
+        Notes                   NVARCHAR(2048)  NULL,
+        CONSTRAINT PK_dbo_Buildings PRIMARY KEY CLUSTERED (Id ASC),
+        CONSTRAINT [FK_dbo.Buildings_dbo.Employees_ResponsibleEmployeeId]
+            FOREIGN KEY (ResponsibleEmployeeId) REFERENCES dbo.Employees (Id)
+    );
+    CREATE UNIQUE NONCLUSTERED INDEX IX_Buildings_Name ON dbo.Buildings (Name);
+    CREATE NONCLUSTERED INDEX IX_Buildings_ResponsibleEmployeeId ON dbo.Buildings (ResponsibleEmployeeId);
+END
+GO
+
+/* Rooms — помещения (номер уникален в пределах одного здания). */
+IF OBJECT_ID(N'dbo.Rooms', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.Rooms
+    (
+        Id                      INT             IDENTITY(1, 1) NOT NULL,
+        BuildingId              INT             NOT NULL,
+        Number                  NVARCHAR(32)    NOT NULL,
+        Floor                   INT             NOT NULL CONSTRAINT DF_Rooms_Floor    DEFAULT (0),
+        AreaSqm                 DECIMAL(10, 2)  NOT NULL CONSTRAINT DF_Rooms_AreaSqm  DEFAULT (0),
+        Purpose                 INT             NOT NULL CONSTRAINT DF_Rooms_Purpose  DEFAULT (1),
+        ResponsibleEmployeeId   INT             NULL,
+        Notes                   NVARCHAR(1024)  NULL,
+        CONSTRAINT PK_dbo_Rooms PRIMARY KEY CLUSTERED (Id ASC),
+        CONSTRAINT [FK_dbo.Rooms_dbo.Buildings_BuildingId]
+            FOREIGN KEY (BuildingId) REFERENCES dbo.Buildings (Id) ON DELETE CASCADE,
+        CONSTRAINT [FK_dbo.Rooms_dbo.Employees_ResponsibleEmployeeId]
+            FOREIGN KEY (ResponsibleEmployeeId) REFERENCES dbo.Employees (Id)
+    );
+    CREATE UNIQUE NONCLUSTERED INDEX IX_Rooms_Building_Number ON dbo.Rooms (BuildingId, Number);
+    CREATE NONCLUSTERED INDEX IX_Rooms_ResponsibleEmployeeId ON dbo.Rooms (ResponsibleEmployeeId);
+END
+GO
+
+/* MaintenanceRequests — заявки на эксплуатационные работы. */
+IF OBJECT_ID(N'dbo.MaintenanceRequests', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.MaintenanceRequests
+    (
+        Id                      INT             IDENTITY(1, 1) NOT NULL,
+        RegistrationDate        DATETIME        NOT NULL,
+        BuildingId              INT             NOT NULL,
+        RoomId                  INT             NULL,
+        RequesterEmployeeId     INT             NOT NULL,
+        Kind                    INT             NOT NULL CONSTRAINT DF_MaintenanceRequests_Kind     DEFAULT (0),
+        Priority                INT             NOT NULL CONSTRAINT DF_MaintenanceRequests_Priority DEFAULT (1),
+        Status                  INT             NOT NULL CONSTRAINT DF_MaintenanceRequests_Status   DEFAULT (0),
+        Description             NVARCHAR(2048)  NOT NULL,
+        AssigneeEmployeeId      INT             NULL,
+        CompletedAt             DATETIME        NULL,
+        Resolution              NVARCHAR(2048)  NULL,
+        LinkedDocumentId        INT             NULL,
+        CONSTRAINT PK_dbo_MaintenanceRequests PRIMARY KEY CLUSTERED (Id ASC),
+        CONSTRAINT [FK_dbo.MaintenanceRequests_dbo.Buildings_BuildingId]
+            FOREIGN KEY (BuildingId) REFERENCES dbo.Buildings (Id),
+        CONSTRAINT [FK_dbo.MaintenanceRequests_dbo.Rooms_RoomId]
+            FOREIGN KEY (RoomId) REFERENCES dbo.Rooms (Id),
+        CONSTRAINT [FK_dbo.MaintenanceRequests_dbo.Employees_RequesterEmployeeId]
+            FOREIGN KEY (RequesterEmployeeId) REFERENCES dbo.Employees (Id),
+        CONSTRAINT [FK_dbo.MaintenanceRequests_dbo.Employees_AssigneeEmployeeId]
+            FOREIGN KEY (AssigneeEmployeeId) REFERENCES dbo.Employees (Id),
+        CONSTRAINT [FK_dbo.MaintenanceRequests_dbo.Documents_LinkedDocumentId]
+            FOREIGN KEY (LinkedDocumentId) REFERENCES dbo.Documents (Id)
+    );
+    CREATE NONCLUSTERED INDEX IX_MaintenanceRequests_BuildingId          ON dbo.MaintenanceRequests (BuildingId);
+    CREATE NONCLUSTERED INDEX IX_MaintenanceRequests_RoomId              ON dbo.MaintenanceRequests (RoomId);
+    CREATE NONCLUSTERED INDEX IX_MaintenanceRequests_RequesterEmployeeId ON dbo.MaintenanceRequests (RequesterEmployeeId);
+    CREATE NONCLUSTERED INDEX IX_MaintenanceRequests_AssigneeEmployeeId  ON dbo.MaintenanceRequests (AssigneeEmployeeId);
+    CREATE NONCLUSTERED INDEX IX_MaintenanceRequests_LinkedDocumentId    ON dbo.MaintenanceRequests (LinkedDocumentId);
+    CREATE NONCLUSTERED INDEX IX_MaintenanceRequests_Status              ON dbo.MaintenanceRequests (Status);
+    CREATE NONCLUSTERED INDEX IX_MaintenanceRequests_RegistrationDate    ON dbo.MaintenanceRequests (RegistrationDate DESC);
+END
+GO
+
+/* FixedAssets — реестр основных средств (форма ОС-6). Инвентарный номер
+   уникален в пределах учреждения. */
+IF OBJECT_ID(N'dbo.FixedAssets', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.FixedAssets
+    (
+        Id                      INT             IDENTITY(1, 1) NOT NULL,
+        InventoryNumber         NVARCHAR(64)    NOT NULL,
+        Name                    NVARCHAR(256)   NOT NULL,
+        Category                INT             NOT NULL CONSTRAINT DF_FixedAssets_Category        DEFAULT (0),
+        Status                  INT             NOT NULL CONSTRAINT DF_FixedAssets_Status          DEFAULT (0),
+        AcquisitionDate         DATETIME        NULL,
+        AcquisitionCost         DECIMAL(18, 2)  NOT NULL CONSTRAINT DF_FixedAssets_AcquisitionCost DEFAULT (0),
+        BookValue               DECIMAL(18, 2)  NOT NULL CONSTRAINT DF_FixedAssets_BookValue       DEFAULT (0),
+        BuildingId              INT             NULL,
+        RoomId                  INT             NULL,
+        ResponsibleEmployeeId   INT             NULL,
+        DecommissionedAt        DATETIME        NULL,
+        DecommissionDocumentId  INT             NULL,
+        Notes                   NVARCHAR(2048)  NULL,
+        CONSTRAINT PK_dbo_FixedAssets PRIMARY KEY CLUSTERED (Id ASC),
+        CONSTRAINT [FK_dbo.FixedAssets_dbo.Buildings_BuildingId]
+            FOREIGN KEY (BuildingId) REFERENCES dbo.Buildings (Id),
+        CONSTRAINT [FK_dbo.FixedAssets_dbo.Rooms_RoomId]
+            FOREIGN KEY (RoomId) REFERENCES dbo.Rooms (Id),
+        CONSTRAINT [FK_dbo.FixedAssets_dbo.Employees_ResponsibleEmployeeId]
+            FOREIGN KEY (ResponsibleEmployeeId) REFERENCES dbo.Employees (Id),
+        CONSTRAINT [FK_dbo.FixedAssets_dbo.Documents_DecommissionDocumentId]
+            FOREIGN KEY (DecommissionDocumentId) REFERENCES dbo.Documents (Id)
+    );
+    CREATE UNIQUE NONCLUSTERED INDEX IX_FixedAssets_InventoryNumber       ON dbo.FixedAssets (InventoryNumber);
+    CREATE NONCLUSTERED INDEX IX_FixedAssets_BuildingId                   ON dbo.FixedAssets (BuildingId);
+    CREATE NONCLUSTERED INDEX IX_FixedAssets_RoomId                       ON dbo.FixedAssets (RoomId);
+    CREATE NONCLUSTERED INDEX IX_FixedAssets_ResponsibleEmployeeId        ON dbo.FixedAssets (ResponsibleEmployeeId);
+    CREATE NONCLUSTERED INDEX IX_FixedAssets_DecommissionDocumentId       ON dbo.FixedAssets (DecommissionDocumentId);
+    CREATE NONCLUSTERED INDEX IX_FixedAssets_Category                     ON dbo.FixedAssets (Category);
+    CREATE NONCLUSTERED INDEX IX_FixedAssets_Status                       ON dbo.FixedAssets (Status);
+END
+GO
+
+/* ---------- 21. (необязательно) лёгкий сид-набор для проверки ------------- */
 /* Расскоментируй блок ниже, если хочешь сразу получить несколько строк.
  * Пароль 'password' берётся из DemoDataSeeder; реальный хеш выставляет
  * приложение при первом запуске — здесь оставляем PasswordHash = NULL,

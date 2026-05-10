@@ -77,6 +77,18 @@ namespace AhuErp.Core.Models
         // фильтры в админ-панели не объединяли разные форматы.
         DocumentExportedToDocx = 107,
 
+        // Phase 18 / Improvement #15 — эксплуатация зданий и реестр ОС.
+        BuildingCreated = 110,
+        BuildingUpdated = 111,
+        RoomCreated = 112,
+        RoomUpdated = 113,
+        MaintenanceRequestCreated = 114,
+        MaintenanceRequestAssigned = 115,
+        MaintenanceRequestStatusChanged = 116,
+        FixedAssetRegistered = 117,
+        FixedAssetUpdated = 118,
+        FixedAssetDecommissioned = 119,
+
         Other = 99
     }
 }

@@ -442,6 +442,100 @@ follow-up вместе с UI.
   `IVehicleMaintenanceService.CheckExpiringDocuments(DateTime.Now)` раз
   в сутки одновременно с `NotificationService.TickReminders`.
 
+### Phase 18 — эксплуатация зданий и реестр основных средств (Improvement #15)
+
+Закрывает требование «эксплуатация зданий, инвентаризация» из info.txt:
+учёт зданий и помещений учреждения, заявки на эксплуатационные работы
+(сантехника / электрика / уборка / ремонт) с собственным жизненным циклом
+и реестр основных средств в бухгалтерском представлении. Отделён от
+Phase 14 (`Equipment` — IT-каталог: сеть, диагностика, тикеты ИТО):
+один и тот же физический объект может присутствовать и в `FixedAsset`
+(инвентарный номер, балансовая стоимость, МОЛ, акт списания), и в
+`Equipment` (IP-адрес, серийный номер, гарантия) с разными ролями.
+
+**Новые модели:**
+- `Building` — здание/корпус: `Name` (уникальное наименование, 128),
+  `Address`, `TotalAreaSqm` (decimal(10,2)), `FloorCount`,
+  `CommissionedYear`, `ResponsibleEmployee` (ответственный за
+  эксплуатацию), `Notes`, коллекция `Rooms`.
+- `Room` — помещение: `Building` (FK + `ON DELETE CASCADE`), `Number`
+  (уникален в пределах здания, 32), `Floor`, `AreaSqm`, `Purpose`
+  (`RoomPurpose`-enum: `Office / Meeting / Storage / Server / Archive /
+  Utility / Lobby / Other`), `ResponsibleEmployee`, `Notes`.
+- `MaintenanceRequest` — заявка на эксплуатационные работы:
+  `RegistrationDate`, `Building` (FK), `Room` (FK, optional),
+  `RequesterEmployee`, `Kind` (`MaintenanceKind`: `Electrical /
+  Plumbing / Cleaning / Repair / Furniture / HVAC / Security / Other`),
+  `Priority` (`Low / Normal / High / Critical`), `Status`
+  (`MaintenanceStatus`: `Open / InProgress / Completed / Cancelled`),
+  `Description`, `AssigneeEmployee`, `CompletedAt`, `Resolution`,
+  `LinkedDocument` (опционально РКК для бюджетного следа).
+- `FixedAsset` — основное средство (форма ОС-6): `InventoryNumber`
+  (уникальный, 64), `Name`, `Category` (`OfficeEquipment / Furniture /
+  Vehicle / Building / Equipment / IntangibleAsset / Other`), `Status`
+  (`InUse / InRepair / InStock / Decommissioned / Lost`),
+  `AcquisitionDate`, `AcquisitionCost`, `BookValue` (оба decimal(18,2)),
+  `Building`, `Room`, `ResponsibleEmployee` (МОЛ), `DecommissionedAt`,
+  `DecommissionDocument` (FK на акт списания), `Notes`.
+
+**Жизненный цикл `MaintenanceRequest` (независим от `DocumentStatus`):**
+- `Open` (стартовый, после `MaintenanceService.CreateRequest`).
+- `InProgress` (после `Assign(requestId, assigneeId, actorId)` —
+  одновременно ставит исполнителя и переводит статус, шлёт
+  `NotificationKind.TaskAssigned` назначенному).
+- `Completed` (после `Complete(requestId, resolution, actorId, now?)` —
+  обязателен `resolution`).
+- `Cancelled` (после `Cancel(requestId, reason, actorId, now?)` —
+  обязательна `reason`).
+- Терминальные `Completed / Cancelled` отвергают `Assign / Complete /
+  Cancel` повторно (через `InvalidOperationException`).
+
+**`BuildingService` / `MaintenanceService`:**
+- `BuildingService` — обёртка над `IBuildingRepository`/`IRoomRepository`:
+  `RegisterBuilding / UpdateBuilding / GetBuilding / ListBuildings /
+  AddRoom / UpdateRoom / ListRooms`. Каждое CRUD-действие пишет аудит
+  (`BuildingCreated/Updated`, `RoomCreated/Updated`).
+- `MaintenanceService` — лайфцикл заявок (см. выше). Каждое изменение
+  пишет аудит (`MaintenanceRequestCreated/Assigned/StatusChanged`).
+  `Assign` параллельно создаёт in-app уведомление исполнителю.
+
+**Новые `AuditActionType` (110…119):**
+`BuildingCreated/Updated`, `RoomCreated/Updated`,
+`MaintenanceRequestCreated/Assigned/StatusChanged`,
+`FixedAssetRegistered/Updated/Decommissioned`.
+
+**Миграция `AddBuildingsMaintenancePhase18`:**
+- Создаёт таблицы `Buildings`, `Rooms`, `MaintenanceRequests`,
+  `FixedAssets` с FK / индексами / уникальными ограничениями
+  (`UQ_Buildings_Name`, `UQ_Rooms_BuildingId_Number`,
+  `UQ_FixedAssets_InventoryNumber`).
+- `Rooms.BuildingId` имеет `ON DELETE CASCADE` — при удалении здания
+  его помещения уходят вместе с ним. Остальные FK оставлены без
+  каскада (`MaintenanceRequest`/`FixedAsset` намеренно оставляют
+  «осиротевшую» ссылку для целостности журнала).
+- Параллельно отражена в `scripts/create-db.sql` (для свежих
+  установок).
+
+**DI:** в `AppServices` зарегистрированы singleton'ом `IBuildingRepository
+/ IRoomRepository / IMaintenanceRequestRepository / IFixedAssetRepository`
+(EF6) и `IBuildingService / IMaintenanceService`.
+
+**RBAC:** просмотр зданий / помещений / заявок доступен всем активным
+сотрудникам; изменение здания / помещения и закрытие заявки —
+`WarehouseManager / Admin`. Назначение исполнителя на заявку —
+`WarehouseManager / Admin`. Списание основного средства — `HRAdmin /
+Admin` (бухгалтерия). Конкретная привязка проверяется в UI и в
+follow-up для `RolePolicy`.
+
+**Что вынесено в follow-up:**
+- WPF-UI: `BuildingsView` / `RoomsView` / `MaintenanceRequestsView` /
+  `FixedAssetsView` с соответствующими ViewModel'ями и навигацией из
+  главного меню (раздел «Эксплуатация»).
+- Привязка `MaintenanceRequest.LinkedDocumentId` к РКК на УI-уровне
+  (выбор существующего документа-основания в форме заявки).
+- Расширение `RolePolicy` на новые модули `buildings` / `maintenance` /
+  `fixed-assets`.
+
 ---
 
 ## Бизнес-инварианты (проверены тестами)

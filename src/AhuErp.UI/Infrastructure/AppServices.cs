@@ -183,6 +183,16 @@ namespace AhuErp.UI.Infrastructure
                 sp.GetRequiredService<IEmployeeRepository>(),
                 sp.GetRequiredService<INotificationRepository>()));
 
+            // Phase 18 / Improvement #15 — здания, помещения, заявки на эксплуатационные
+            // работы и реестр основных средств (бухгалтерское представление, отдельно
+            // от IT-каталога Equipment).
+            services.AddSingleton<IBuildingRepository, EfBuildingRepository>();
+            services.AddSingleton<IRoomRepository, EfRoomRepository>();
+            services.AddSingleton<IMaintenanceRequestRepository, EfMaintenanceRequestRepository>();
+            services.AddSingleton<IFixedAssetRepository, EfFixedAssetRepository>();
+            services.AddSingleton<IBuildingService, BuildingService>();
+            services.AddSingleton<IMaintenanceService, MaintenanceService>();
+
             // UI-инфраструктура
             services.AddSingleton<IFileDialogService, FileDialogService>();
             services.AddSingleton<DocumentNavigator>();
