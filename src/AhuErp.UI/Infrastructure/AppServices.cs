@@ -194,6 +194,14 @@ namespace AhuErp.UI.Infrastructure
             services.AddSingleton<IBuildingService, BuildingService>();
             services.AddSingleton<IMaintenanceService, MaintenanceService>();
 
+            // Phase 20 / Improvement #13 — закупки 44-ФЗ: планы, процедуры, контракты,
+            // этапы исполнения. Напоминание о приближении срока этапа отправляется
+            // через INotificationService.
+            services.AddSingleton<IProcurementPlanRepository, EfProcurementPlanRepository>();
+            services.AddSingleton<IProcurementProcedureRepository, EfProcurementProcedureRepository>();
+            services.AddSingleton<IContractRepository, EfContractRepository>();
+            services.AddSingleton<IProcurementService, ProcurementService>();
+
             // UI-инфраструктура
             services.AddSingleton<IFileDialogService, FileDialogService>();
             services.AddSingleton<DocumentNavigator>();
@@ -224,6 +232,7 @@ namespace AhuErp.UI.Infrastructure
             services.AddTransient<SubstitutionsViewModel>();
             services.AddTransient<MyDesktopViewModel>();
             services.AddTransient<NotificationPrefsViewModel>();
+            services.AddTransient<ProcurementViewModel>();
         }
     }
 }

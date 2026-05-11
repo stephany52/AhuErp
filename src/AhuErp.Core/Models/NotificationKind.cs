@@ -20,6 +20,10 @@ namespace AhuErp.Core.Models
         VehicleTechInspectionExpiringSoon = 11,
         VehicleMaintenanceDueSoon = 12,
 
+        // ---- Phase 20 / Improvement #13 — закупки 44-ФЗ. ----
+        ContractMilestoneDueSoon = 20,
+        ContractMilestoneOverdue = 21,
+
         System = 99,
     }
 }

@@ -1370,6 +1370,161 @@ BEGIN
 END
 GO
 
+/* ============================================================================
+   Phase 20 / Improvement #13 — закупки 44-ФЗ.
+   План-графики, процедуры, муниципальные контракты и этапы исполнения.
+   ============================================================================ */
+
+/* ProcurementPlans — план-график закупок на финансовый год (ст. 16 44-ФЗ).
+   Жизненный цикл: Draft (0) → Approved (1) → Published (2) → Closed (3). */
+IF OBJECT_ID(N'dbo.ProcurementPlans', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.ProcurementPlans
+    (
+        Id                      INT             IDENTITY(1, 1) NOT NULL,
+        Year                    INT             NOT NULL CONSTRAINT DF_ProcurementPlans_Year   DEFAULT (0),
+        Title                   NVARCHAR(256)   NOT NULL,
+        Status                  INT             NOT NULL CONSTRAINT DF_ProcurementPlans_Status DEFAULT (0),
+        CreatedAt               DATETIME        NOT NULL,
+        ApprovedAt              DATETIME        NULL,
+        ApprovedByEmployeeId    INT             NULL,
+        PublishedAt             DATETIME        NULL,
+        EisRegistrationNumber   NVARCHAR(64)    NULL,
+        Notes                   NVARCHAR(2048)  NULL,
+        CONSTRAINT PK_dbo_ProcurementPlans PRIMARY KEY CLUSTERED (Id ASC),
+        CONSTRAINT [FK_dbo.ProcurementPlans_dbo.Employees_ApprovedByEmployeeId]
+            FOREIGN KEY (ApprovedByEmployeeId) REFERENCES dbo.Employees (Id)
+    );
+    CREATE UNIQUE NONCLUSTERED INDEX IX_ProcurementPlans_Year                 ON dbo.ProcurementPlans (Year);
+    CREATE NONCLUSTERED INDEX        IX_ProcurementPlans_Status               ON dbo.ProcurementPlans (Status);
+    CREATE NONCLUSTERED INDEX        IX_ProcurementPlans_ApprovedByEmployeeId ON dbo.ProcurementPlans (ApprovedByEmployeeId);
+END
+GO
+
+/* ProcurementPlanItems — позиции плана: ОКПД2, НМЦК, способ определения
+   поставщика, плановый квартал и источник финансирования. */
+IF OBJECT_ID(N'dbo.ProcurementPlanItems', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.ProcurementPlanItems
+    (
+        Id                      INT             IDENTITY(1, 1) NOT NULL,
+        ProcurementPlanId       INT             NOT NULL,
+        LineNumber              INT             NOT NULL CONSTRAINT DF_ProcurementPlanItems_LineNumber       DEFAULT (0),
+        Okpd2Code               NVARCHAR(32)    NOT NULL,
+        Subject                 NVARCHAR(512)   NOT NULL,
+        InitialMaxPrice         DECIMAL(18, 2)  NOT NULL CONSTRAINT DF_ProcurementPlanItems_InitialMaxPrice  DEFAULT (0),
+        Method                  INT             NOT NULL CONSTRAINT DF_ProcurementPlanItems_Method           DEFAULT (0),
+        PlannedQuarter          INT             NOT NULL CONSTRAINT DF_ProcurementPlanItems_PlannedQuarter   DEFAULT (1),
+        FundingSource           NVARCHAR(128)   NULL,
+        Notes                   NVARCHAR(2048)  NULL,
+        CONSTRAINT PK_dbo_ProcurementPlanItems PRIMARY KEY CLUSTERED (Id ASC),
+        CONSTRAINT [FK_dbo.ProcurementPlanItems_dbo.ProcurementPlans_ProcurementPlanId]
+            FOREIGN KEY (ProcurementPlanId) REFERENCES dbo.ProcurementPlans (Id) ON DELETE CASCADE
+    );
+    CREATE NONCLUSTERED INDEX IX_ProcurementPlanItems_ProcurementPlanId ON dbo.ProcurementPlanItems (ProcurementPlanId);
+    CREATE NONCLUSTERED INDEX IX_ProcurementPlanItems_Okpd2Code         ON dbo.ProcurementPlanItems (Okpd2Code);
+END
+GO
+
+/* ProcurementProcedures — конкретные процедуры закупки (электронный аукцион,
+   запрос котировок, единственный поставщик) и их результаты. */
+IF OBJECT_ID(N'dbo.ProcurementProcedures', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.ProcurementProcedures
+    (
+        Id                      INT             IDENTITY(1, 1) NOT NULL,
+        ProcurementPlanItemId   INT             NOT NULL,
+        EisNoticeNumber         NVARCHAR(64)    NULL,
+        Method                  INT             NOT NULL CONSTRAINT DF_ProcurementProcedures_Method DEFAULT (0),
+        Status                  INT             NOT NULL CONSTRAINT DF_ProcurementProcedures_Status DEFAULT (0),
+        AnnouncedAt             DATETIME        NULL,
+        BidsDeadline            DATETIME        NULL,
+        AwardDecisionAt         DATETIME        NULL,
+        AwardedSupplierInn      NVARCHAR(32)    NULL,
+        AwardedSupplierName     NVARCHAR(512)   NULL,
+        AwardedPrice            DECIMAL(18, 2)  NULL,
+        Notes                   NVARCHAR(2048)  NULL,
+        CONSTRAINT PK_dbo_ProcurementProcedures PRIMARY KEY CLUSTERED (Id ASC),
+        CONSTRAINT [FK_dbo.ProcurementProcedures_dbo.ProcurementPlanItems_ProcurementPlanItemId]
+            FOREIGN KEY (ProcurementPlanItemId) REFERENCES dbo.ProcurementPlanItems (Id)
+    );
+    CREATE NONCLUSTERED INDEX IX_ProcurementProcedures_ProcurementPlanItemId ON dbo.ProcurementProcedures (ProcurementPlanItemId);
+    CREATE NONCLUSTERED INDEX IX_ProcurementProcedures_Status                ON dbo.ProcurementProcedures (Status);
+    CREATE NONCLUSTERED INDEX IX_ProcurementProcedures_AwardedSupplierInn    ON dbo.ProcurementProcedures (AwardedSupplierInn);
+END
+GO
+
+/* Phase 20 — поля контракта на TPH-таблице Documents (DocumentDiscriminator = 'Contract'). */
+IF COL_LENGTH(N'dbo.Documents', N'ProcurementProcedureId') IS NULL
+    ALTER TABLE dbo.Documents ADD ProcurementProcedureId INT NULL;
+GO
+IF COL_LENGTH(N'dbo.Documents', N'SupplierName') IS NULL
+    ALTER TABLE dbo.Documents ADD SupplierName NVARCHAR(512) NULL;
+GO
+IF COL_LENGTH(N'dbo.Documents', N'SupplierInn') IS NULL
+    ALTER TABLE dbo.Documents ADD SupplierInn NVARCHAR(32) NULL;
+GO
+IF COL_LENGTH(N'dbo.Documents', N'SupplierKpp') IS NULL
+    ALTER TABLE dbo.Documents ADD SupplierKpp NVARCHAR(32) NULL;
+GO
+IF COL_LENGTH(N'dbo.Documents', N'ContractAmount') IS NULL
+    ALTER TABLE dbo.Documents ADD ContractAmount DECIMAL(18, 2) NULL;
+GO
+IF COL_LENGTH(N'dbo.Documents', N'FundingSource') IS NULL
+    ALTER TABLE dbo.Documents ADD FundingSource NVARCHAR(128) NULL;
+GO
+IF COL_LENGTH(N'dbo.Documents', N'ContractStartDate') IS NULL
+    ALTER TABLE dbo.Documents ADD ContractStartDate DATETIME NULL;
+GO
+IF COL_LENGTH(N'dbo.Documents', N'ContractEndDate') IS NULL
+    ALTER TABLE dbo.Documents ADD ContractEndDate DATETIME NULL;
+GO
+IF COL_LENGTH(N'dbo.Documents', N'ContractStatus') IS NULL
+    ALTER TABLE dbo.Documents ADD ContractStatus INT NULL;
+GO
+IF COL_LENGTH(N'dbo.Documents', N'SignedAt') IS NULL
+    ALTER TABLE dbo.Documents ADD SignedAt DATETIME NULL;
+GO
+IF COL_LENGTH(N'dbo.Documents', N'ExecutedAt') IS NULL
+    ALTER TABLE dbo.Documents ADD ExecutedAt DATETIME NULL;
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys
+               WHERE [name] = N'FK_dbo.Documents_dbo.ProcurementProcedures_ProcurementProcedureId')
+    ALTER TABLE dbo.Documents
+    ADD CONSTRAINT [FK_dbo.Documents_dbo.ProcurementProcedures_ProcurementProcedureId]
+        FOREIGN KEY (ProcurementProcedureId) REFERENCES dbo.ProcurementProcedures (Id);
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.indexes
+               WHERE [name] = N'IX_Documents_ProcurementProcedureId'
+                 AND object_id = OBJECT_ID(N'dbo.Documents'))
+    CREATE NONCLUSTERED INDEX IX_Documents_ProcurementProcedureId ON dbo.Documents (ProcurementProcedureId);
+GO
+
+/* ContractMilestones — этапы исполнения контракта (ст. 94 44-ФЗ). */
+IF OBJECT_ID(N'dbo.ContractMilestones', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.ContractMilestones
+    (
+        Id                       INT             IDENTITY(1, 1) NOT NULL,
+        ContractId               INT             NOT NULL,
+        SequenceNumber           INT             NOT NULL CONSTRAINT DF_ContractMilestones_SequenceNumber DEFAULT (0),
+        Title                    NVARCHAR(512)   NOT NULL,
+        PlannedDate              DATETIME        NOT NULL,
+        ActualDate               DATETIME        NULL,
+        Amount                   DECIMAL(18, 2)  NOT NULL CONSTRAINT DF_ContractMilestones_Amount         DEFAULT (0),
+        Status                   INT             NOT NULL CONSTRAINT DF_ContractMilestones_Status         DEFAULT (0),
+        DeadlineReminderSentAt   DATETIME        NULL,
+        Notes                    NVARCHAR(2048)  NULL,
+        CONSTRAINT PK_dbo_ContractMilestones PRIMARY KEY CLUSTERED (Id ASC),
+        CONSTRAINT [FK_dbo.ContractMilestones_dbo.Documents_ContractId]
+            FOREIGN KEY (ContractId) REFERENCES dbo.Documents (Id) ON DELETE CASCADE
+    );
+    CREATE NONCLUSTERED INDEX IX_ContractMilestones_ContractId  ON dbo.ContractMilestones (ContractId);
+    CREATE NONCLUSTERED INDEX IX_ContractMilestones_Status      ON dbo.ContractMilestones (Status);
+    CREATE NONCLUSTERED INDEX IX_ContractMilestones_PlannedDate ON dbo.ContractMilestones (PlannedDate);
+END
+GO
+
 PRINT N'AhuErpDb: схема создана / актуальна.';
 PRINT N'Дальше можно накатить демо-данные: scripts/seed-db.sql';
 GO

@@ -48,6 +48,9 @@ namespace AhuErp.Core.Services
         // ---- Bug #6 / Improvement #9 — админ-панель (только Admin). ----
         public const string AdminPanel = nameof(AdminPanel);
 
+        // ---- Phase 20 / Improvement #13 — закупки 44-ФЗ. ----
+        public const string Procurement = nameof(Procurement);
+
         // ---- Bug #1 — автоматическая регистрация РКК при сохранении. ----
         public static bool AutoRegisterOnSave { get; set; } = true;
 
@@ -59,7 +62,7 @@ namespace AhuErp.Core.Services
         {
             MyDesktop, Dashboard, Office, MyTasks, Archive, Warehouse, ItService, Fleet,
             Nomenclature, Journals, Search, Reports, OrgStructure, Substitutions,
-            NotificationPrefs, AuditJournal, AdminPanel,
+            NotificationPrefs, AuditJournal, AdminPanel, Procurement,
         };
 
         /// <summary>
@@ -72,7 +75,7 @@ namespace AhuErp.Core.Services
         private static readonly IReadOnlyDictionary<EmployeeRole, HashSet<string>> ModuleMatrix =
             new Dictionary<EmployeeRole, HashSet<string>>
             {
-                // Полный доступ ко всем 17 модулям, включая админ-панель.
+                // Полный доступ ко всем 18 модулям, включая админ-панель и закупки.
                 [EmployeeRole.Admin] = new HashSet<string>(AllModuleKeys),
 
                 // Руководитель: всё кроме админ-панели. Внутри модулей
@@ -82,7 +85,7 @@ namespace AhuErp.Core.Services
                 {
                     MyDesktop, Dashboard, Office, MyTasks, Archive, Warehouse, ItService, Fleet,
                     Nomenclature, Journals, Search, Reports, OrgStructure, Substitutions,
-                    NotificationPrefs, AuditJournal,
+                    NotificationPrefs, AuditJournal, Procurement,
                 },
 
                 // Зам. руководителя: матрица идентична Manager. Если в будущем
@@ -91,7 +94,7 @@ namespace AhuErp.Core.Services
                 {
                     MyDesktop, Dashboard, Office, MyTasks, Archive, Warehouse, ItService, Fleet,
                     Nomenclature, Journals, Search, Reports, OrgStructure, Substitutions,
-                    NotificationPrefs, AuditJournal,
+                    NotificationPrefs, AuditJournal, Procurement,
                 },
 
                 // Архивист: РКК, архив, номенклатура, журналы, поиск, отчёты,
@@ -123,11 +126,12 @@ namespace AhuErp.Core.Services
 
                 // Делопроизводитель: входящие/исходящие/внутренние/договоры,
                 // номенклатура, поиск, отчёты, журналы. Без склада, транспорта
-                // и ИТО.
+                // и ИТО. Карточка «Закупки» — виден, права на редактирование только
+                // у Admin/Manager/DeputyHead (проверяется в ProcurementService).
                 [EmployeeRole.Clerk] = new HashSet<string>
                 {
                     MyDesktop, Dashboard, Office, MyTasks, Archive, Nomenclature,
-                    Journals, Search, Reports, OrgStructure, NotificationPrefs,
+                    Journals, Search, Reports, OrgStructure, NotificationPrefs, Procurement,
                 },
 
                 // Кадры: только оргструктура (edit) + замещения + личный
@@ -257,6 +261,28 @@ namespace AhuErp.Core.Services
         /// <summary>Каждый сотрудник управляет своими предпочтениями уведомлений.</summary>
         public static bool CanManageNotificationPrefs(EmployeeRole r)
             => IsAllowed(r, NotificationPrefs);
+
+        // ============================================================
+        // Phase 20 / Improvement #13 — закупки 44-ФЗ.
+        // ============================================================
+
+        /// <summary>
+        /// Редактирование плана-графика закупок, размещение процедур и
+        /// регистрация контрактов 44-ФЗ — прерогатива администратора,
+        /// руководителя и заместителя руководителя. Делопроизводитель
+        /// видит модуль (карточка), но не имеет прав на изменения.
+        /// </summary>
+        public static bool CanManageProcurement(EmployeeRole r)
+            => r == EmployeeRole.Admin
+               || r == EmployeeRole.Manager
+               || r == EmployeeRole.DeputyHead;
+
+        /// <summary>
+        /// Чтение карточки «Закупки» (план-график, процедуры, контракты) —
+        /// всем, у кого модуль <see cref="Procurement"/> в матрице.
+        /// </summary>
+        public static bool CanReadProcurement(EmployeeRole r)
+            => IsAllowed(r, Procurement);
 
         /// <summary>
         /// Право принять входящую складскую операцию (приход, инвентаризация).
