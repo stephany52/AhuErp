@@ -25,9 +25,10 @@ namespace AhuErp.Core.Services
         private readonly INomenclatureRepository _nomenclature;
         private readonly IVehicleRepository _vehicles;
         private readonly IAuditService _audit;
+        private readonly IDestructionActRepository _destructionActs;
 
         public ReportService(IInventoryRepository inventory, IDocumentRepository documents)
-            : this(inventory, documents, null, null, null, null, null)
+            : this(inventory, documents, null, null, null, null, null, null)
         {
         }
 
@@ -42,7 +43,7 @@ namespace AhuErp.Core.Services
             ITaskService tasks,
             ITaskRepository taskRepo,
             INomenclatureRepository nomenclature)
-            : this(inventory, documents, tasks, taskRepo, nomenclature, null, null)
+            : this(inventory, documents, tasks, taskRepo, nomenclature, null, null, null)
         {
         }
 
@@ -59,6 +60,24 @@ namespace AhuErp.Core.Services
             INomenclatureRepository nomenclature,
             IVehicleRepository vehicles,
             IAuditService audit)
+            : this(inventory, documents, tasks, taskRepo, nomenclature, vehicles, audit, null)
+        {
+        }
+
+        /// <summary>
+        /// Phase 19 — добавляется репозиторий актов о выделении к уничтожению
+        /// (для DOCX-выгрузки). Старые перегрузки оставлены ради совместимости
+        /// с тестами и кодом, который не использует Phase 19.
+        /// </summary>
+        public ReportService(
+            IInventoryRepository inventory,
+            IDocumentRepository documents,
+            ITaskService tasks,
+            ITaskRepository taskRepo,
+            INomenclatureRepository nomenclature,
+            IVehicleRepository vehicles,
+            IAuditService audit,
+            IDestructionActRepository destructionActs)
         {
             _inventory = inventory ?? throw new ArgumentNullException(nameof(inventory));
             _documents = documents ?? throw new ArgumentNullException(nameof(documents));
@@ -67,6 +86,7 @@ namespace AhuErp.Core.Services
             _nomenclature = nomenclature;
             _vehicles = vehicles;
             _audit = audit;
+            _destructionActs = destructionActs;
         }
 
         public void ExportInventoryToExcel(string filePath)
@@ -1339,6 +1359,231 @@ namespace AhuErp.Core.Services
                 case InventarizationScope.Vehicles: return "Транспорт";
                 case InventarizationScope.Other: return "Иное";
                 default: return scope.ToString();
+            }
+        }
+
+        // ================================================================
+        // Phase 19 / Improvement #16 — архив и долговременное хранение.
+        // ================================================================
+
+        public void GenerateDestructionAct(int actId, string filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath))
+                throw new ArgumentException("Путь к файлу обязателен.", nameof(filePath));
+            if (_destructionActs == null)
+                throw new InvalidOperationException(
+                    "ReportService не настроен для актов уничтожения (нет IDestructionActRepository).");
+
+            var act = _destructionActs.Get(actId)
+                ?? throw new InvalidOperationException(
+                    $"Акт уничтожения #{actId} не найден.");
+
+            using (var doc = WordprocessingDocument.Create(filePath, WordprocessingDocumentType.Document))
+            {
+                var main = doc.AddMainDocumentPart();
+                main.Document = new W.Document();
+                var body = main.Document.AppendChild(new W.Body());
+
+                body.AppendChild(Paragraph(OrganizationProfile.FullName));
+                body.AppendChild(Paragraph(OrganizationProfile.ArchiveDepartmentName));
+                body.AppendChild(Paragraph(string.Empty));
+                body.AppendChild(Heading("АКТ"));
+                body.AppendChild(Heading("о выделении к уничтожению архивных документов,"));
+                body.AppendChild(Heading("не подлежащих хранению"));
+                body.AppendChild(Paragraph(string.Empty));
+                body.AppendChild(Paragraph($"№ {act.ActNumber} от {act.ActDate:dd.MM.yyyy}"));
+                body.AppendChild(Paragraph($"Статус: {FormatDestructionStatus(act.Status)}"));
+                body.AppendChild(Paragraph(string.Empty));
+                body.AppendChild(Paragraph(
+                    "На основании Перечня типовых управленческих архивных документов с указанием сроков " +
+                    "хранения (Приказ Росархива от 20.12.2019 № 236) и Правил организации хранения, " +
+                    "комплектования, учёта и использования документов Архивного фонда Российской Федерации " +
+                    "(Приказ Минкультуры от 31.03.2015 № 526) отобраны к уничтожению как утратившие " +
+                    "практическое значение и не имеющие научно-исторической ценности следующие дела:"));
+                body.AppendChild(Paragraph(string.Empty));
+
+                // Шапка таблицы по форме приложения № 21 (упрощённый вариант).
+                var table = new W.Table();
+                table.AppendChild(new W.TableProperties(
+                    new W.TableBorders(
+                        new W.TopBorder { Val = W.BorderValues.Single, Size = 4 },
+                        new W.BottomBorder { Val = W.BorderValues.Single, Size = 4 },
+                        new W.LeftBorder { Val = W.BorderValues.Single, Size = 4 },
+                        new W.RightBorder { Val = W.BorderValues.Single, Size = 4 },
+                        new W.InsideHorizontalBorder { Val = W.BorderValues.Single, Size = 4 },
+                        new W.InsideVerticalBorder { Val = W.BorderValues.Single, Size = 4 })));
+
+                table.AppendChild(MakeRow(true,
+                    "№",
+                    "Индекс дела",
+                    "Заголовок дела",
+                    "Крайние даты",
+                    "Кол-во документов",
+                    "Срок хранения / Статья",
+                    "Примечание"));
+
+                int n = 1;
+                foreach (var item in act.Items.OrderBy(i => i.CaseYear).ThenBy(i => i.CaseIndex))
+                {
+                    table.AppendChild(MakeRow(false,
+                        n.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                        item.CaseIndex ?? "—",
+                        item.CaseTitle ?? "—",
+                        item.CaseYear > 0
+                            ? item.CaseYear.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                            : "—",
+                        item.DocumentCount.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                        item.RetentionYears > 0
+                            ? string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                                "{0} лет{1}", item.RetentionYears,
+                                string.IsNullOrWhiteSpace(item.Article) ? string.Empty : $" / ст. {item.Article}")
+                            : "—",
+                        NullSafe(item.Notes)));
+                    n++;
+                }
+
+                body.AppendChild(table);
+                body.AppendChild(Paragraph(string.Empty));
+
+                body.AppendChild(Paragraph(
+                    $"Итого: {act.Items.Count} ед. хранения за период " +
+                    $"{(act.Items.Count == 0 ? "—" : act.Items.Min(i => i.CaseYear).ToString())}–" +
+                    $"{(act.Items.Count == 0 ? "—" : act.Items.Max(i => i.CaseYear).ToString())}."));
+
+                if (!string.IsNullOrWhiteSpace(act.DestructionMethod))
+                    body.AppendChild(Paragraph($"Способ уничтожения: {act.DestructionMethod}."));
+                if (!string.IsNullOrWhiteSpace(act.Notes))
+                    body.AppendChild(Paragraph($"Примечание: {act.Notes}"));
+
+                body.AppendChild(Paragraph(string.Empty));
+                body.AppendChild(Paragraph(
+                    $"Проект составил: ______________________ {NullSafe(act.DraftedByEmployee?.FullName)}"));
+                if (act.ApprovedByEmployeeId.HasValue)
+                {
+                    body.AppendChild(Paragraph(
+                        $"Утверждено: ______________________ {NullSafe(act.ApprovedByEmployee?.FullName)}, " +
+                        $"{(act.ApprovedAt?.ToString("dd.MM.yyyy") ?? "—")}"));
+                }
+                if (act.ExecutedAt.HasValue)
+                    body.AppendChild(Paragraph($"Исполнено: {act.ExecutedAt:dd.MM.yyyy}"));
+
+                main.Document.Save();
+            }
+
+            _audit?.Record(AuditActionType.DocumentExportedToDocx,
+                entityType: nameof(DestructionAct), entityId: actId, userId: null,
+                details: $"docx={System.IO.Path.GetFileName(filePath)}; items={act.Items.Count}");
+        }
+
+        public void GenerateArchiveResponse(int archiveRequestId, ArchiveResponseKind kind, string filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath))
+                throw new ArgumentException("Путь к файлу обязателен.", nameof(filePath));
+
+            var document = _documents.GetById(archiveRequestId) as ArchiveRequest
+                ?? throw new InvalidOperationException(
+                    $"Архивный запрос #{archiveRequestId} не найден.");
+
+            using (var doc = WordprocessingDocument.Create(filePath, WordprocessingDocumentType.Document))
+            {
+                var main = doc.AddMainDocumentPart();
+                main.Document = new W.Document();
+                var body = main.Document.AppendChild(new W.Body());
+
+                body.AppendChild(Paragraph(OrganizationProfile.FullName));
+                body.AppendChild(Paragraph(OrganizationProfile.ArchiveDepartmentName));
+                body.AppendChild(Paragraph(OrganizationProfile.ArchiveAddress));
+                body.AppendChild(Paragraph(
+                    $"Телефон: {OrganizationProfile.ArchivePhone}; e-mail: {OrganizationProfile.ArchiveEmail}"));
+                body.AppendChild(Paragraph(string.Empty));
+                body.AppendChild(Heading(GetArchiveResponseTitle(kind)));
+                body.AppendChild(Paragraph(string.Empty));
+                body.AppendChild(Paragraph(
+                    $"по архивному запросу № {document.Id} от {document.CreationDate:dd.MM.yyyy}"));
+                body.AppendChild(Paragraph($"Тема запроса: {document.Title}"));
+                body.AppendChild(Paragraph($"Заявитель: {NullSafe(document.Correspondent)}"));
+                body.AppendChild(Paragraph(string.Empty));
+
+                switch (kind)
+                {
+                    case ArchiveResponseKind.Spravka:
+                        body.AppendChild(Paragraph(
+                            "Архивный отдел свидетельствует, что в документах архивного фонда содержатся " +
+                            "сведения по существу запроса. Информация приводится по подлинным документам, " +
+                            "хранящимся в архивном отделе на дату оформления настоящей справки."));
+                        break;
+                    case ArchiveResponseKind.Vypiska:
+                        body.AppendChild(Paragraph(
+                            "Архивный отдел подтверждает достоверность нижеследующей выписки из " +
+                            "документа, хранящегося в архивном отделе. Текст выписки приводится " +
+                            "дословно по подлиннику."));
+                        break;
+                    case ArchiveResponseKind.Kopiya:
+                        body.AppendChild(Paragraph(
+                            "Архивный отдел заверяет, что приложенная копия документа изготовлена " +
+                            "с подлинника, хранящегося в архивном отделе, и идентична подлиннику. " +
+                            "Подчисток и исправлений нет."));
+                        break;
+                }
+
+                body.AppendChild(Paragraph(string.Empty));
+                body.AppendChild(Paragraph(
+                    $"Начальник архивного отдела _________________________ {OrganizationProfile.ArchiveHeadShortName}"));
+                body.AppendChild(Paragraph($"Дата оформления: {DateTime.Now:dd.MM.yyyy}"));
+                body.AppendChild(Paragraph(string.Empty));
+                body.AppendChild(Paragraph("МП"));
+
+                main.Document.Save();
+            }
+
+            _audit?.Record(AuditActionType.ArchiveResponseIssued,
+                entityType: nameof(ArchiveRequest), entityId: archiveRequestId, userId: null,
+                details: $"kind={kind}; docx={System.IO.Path.GetFileName(filePath)}");
+        }
+
+        private static W.TableRow MakeRow(bool header, params string[] cells)
+        {
+            var row = new W.TableRow();
+            foreach (var text in cells)
+            {
+                var cell = new W.TableCell();
+                var p = new W.Paragraph();
+                var run = p.AppendChild(new W.Run());
+                if (header)
+                {
+                    var rp = run.AppendChild(new W.RunProperties());
+                    rp.AppendChild(new W.Bold());
+                }
+                run.AppendChild(new W.Text(text ?? string.Empty)
+                {
+                    Space = SpaceProcessingModeValues.Preserve
+                });
+                cell.AppendChild(p);
+                row.AppendChild(cell);
+            }
+            return row;
+        }
+
+        private static string FormatDestructionStatus(DestructionStatus status)
+        {
+            switch (status)
+            {
+                case DestructionStatus.Draft: return "Проект";
+                case DestructionStatus.Approved: return "Утверждён";
+                case DestructionStatus.Executed: return "Исполнен";
+                case DestructionStatus.Cancelled: return "Отменён";
+                default: return status.ToString();
+            }
+        }
+
+        private static string GetArchiveResponseTitle(ArchiveResponseKind kind)
+        {
+            switch (kind)
+            {
+                case ArchiveResponseKind.Spravka: return "АРХИВНАЯ СПРАВКА";
+                case ArchiveResponseKind.Vypiska: return "АРХИВНАЯ ВЫПИСКА";
+                case ArchiveResponseKind.Kopiya: return "АРХИВНАЯ КОПИЯ";
+                default: return "АРХИВНЫЙ ОТВЕТ";
             }
         }
     }

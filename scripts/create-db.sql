@@ -1310,6 +1310,66 @@ BEGIN CATCH
 END CATCH
 GO
 
+/* ---------- 24. Phase 19 — Archive retention & destruction acts ----------- */
+/* DestructionActs — акты о выделении к уничтожению архивных документов
+   (Приказ Минкультуры от 31.03.2015 № 526, приложение № 21;
+   Приказ Росархива от 20.12.2019 № 236). Жизненный цикл независим
+   от DocumentStatus: Draft (0) → Approved (1) → Executed (2) | Cancelled (3). */
+IF OBJECT_ID(N'dbo.DestructionActs', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.DestructionActs
+    (
+        Id                      INT             IDENTITY(1, 1) NOT NULL,
+        ActNumber               NVARCHAR(64)    NOT NULL,
+        ActDate                 DATETIME        NOT NULL,
+        Status                  INT             NOT NULL CONSTRAINT DF_DestructionActs_Status DEFAULT (0),
+        DraftedByEmployeeId     INT             NOT NULL,
+        ApprovedByEmployeeId    INT             NULL,
+        ApprovedAt              DATETIME        NULL,
+        ExecutedAt              DATETIME        NULL,
+        DestructionMethod       NVARCHAR(256)   NULL,
+        Notes                   NVARCHAR(4096)  NULL,
+        CONSTRAINT PK_dbo_DestructionActs PRIMARY KEY CLUSTERED (Id ASC),
+        CONSTRAINT [FK_dbo.DestructionActs_dbo.Employees_DraftedByEmployeeId]
+            FOREIGN KEY (DraftedByEmployeeId) REFERENCES dbo.Employees (Id),
+        CONSTRAINT [FK_dbo.DestructionActs_dbo.Employees_ApprovedByEmployeeId]
+            FOREIGN KEY (ApprovedByEmployeeId) REFERENCES dbo.Employees (Id)
+    );
+    CREATE UNIQUE NONCLUSTERED INDEX IX_DestructionActs_ActNumber            ON dbo.DestructionActs (ActNumber);
+    CREATE NONCLUSTERED INDEX        IX_DestructionActs_Status               ON dbo.DestructionActs (Status);
+    CREATE NONCLUSTERED INDEX        IX_DestructionActs_ActDate              ON dbo.DestructionActs (ActDate DESC);
+    CREATE NONCLUSTERED INDEX        IX_DestructionActs_DraftedByEmployeeId  ON dbo.DestructionActs (DraftedByEmployeeId);
+    CREATE NONCLUSTERED INDEX        IX_DestructionActs_ApprovedByEmployeeId ON dbo.DestructionActs (ApprovedByEmployeeId);
+END
+GO
+
+/* DestructionActItems — позиции акта (денормализованный снимок дел).
+   При удалении исходного NomenclatureCases-дела позиция сохраняется. */
+IF OBJECT_ID(N'dbo.DestructionActItems', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.DestructionActItems
+    (
+        Id                      INT             IDENTITY(1, 1) NOT NULL,
+        DestructionActId        INT             NOT NULL,
+        NomenclatureCaseId      INT             NULL,
+        CaseIndex               NVARCHAR(32)    NOT NULL,
+        CaseTitle               NVARCHAR(512)   NOT NULL,
+        CaseYear                INT             NOT NULL CONSTRAINT DF_DestructionActItems_CaseYear        DEFAULT (0),
+        RetentionYears          INT             NOT NULL CONSTRAINT DF_DestructionActItems_RetentionYears  DEFAULT (0),
+        DocumentCount           INT             NOT NULL CONSTRAINT DF_DestructionActItems_DocumentCount   DEFAULT (0),
+        Article                 NVARCHAR(64)    NULL,
+        Notes                   NVARCHAR(1024)  NULL,
+        CONSTRAINT PK_dbo_DestructionActItems PRIMARY KEY CLUSTERED (Id ASC),
+        CONSTRAINT [FK_dbo.DestructionActItems_dbo.DestructionActs_DestructionActId]
+            FOREIGN KEY (DestructionActId) REFERENCES dbo.DestructionActs (Id) ON DELETE CASCADE,
+        CONSTRAINT [FK_dbo.DestructionActItems_dbo.NomenclatureCases_NomenclatureCaseId]
+            FOREIGN KEY (NomenclatureCaseId) REFERENCES dbo.NomenclatureCases (Id)
+    );
+    CREATE NONCLUSTERED INDEX IX_DestructionActItems_DestructionActId   ON dbo.DestructionActItems (DestructionActId);
+    CREATE NONCLUSTERED INDEX IX_DestructionActItems_NomenclatureCaseId ON dbo.DestructionActItems (NomenclatureCaseId);
+END
+GO
+
 PRINT N'AhuErpDb: схема создана / актуальна.';
 PRINT N'Дальше можно накатить демо-данные: scripts/seed-db.sql';
 GO

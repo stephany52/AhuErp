@@ -89,6 +89,14 @@ namespace AhuErp.Core.Models
         FixedAssetUpdated = 118,
         FixedAssetDecommissioned = 119,
 
+        // Phase 19 / Improvement #16 — архив: сроки хранения и уничтожение.
+        DestructionActDrafted = 120,
+        DestructionActApproved = 121,
+        DestructionActExecuted = 122,
+        DestructionActCancelled = 123,
+        RetentionScanCompleted = 124,
+        ArchiveResponseIssued = 125,
+
         Other = 99
     }
 }

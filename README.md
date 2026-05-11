@@ -536,6 +536,117 @@ follow-up для `RolePolicy`.
 - Расширение `RolePolicy` на новые модули `buildings` / `maintenance` /
   `fixed-assets`.
 
+### Phase 19 — архив и долговременное хранение (Improvement #16)
+
+Закрывает требование «архив и долговременное хранение» из info.txt:
+жизненный цикл дел с истёкшим сроком хранения от поиска кандидатов
+к актированию до физического уничтожения, а также формирование
+ответов архива (справка / выписка / копия) на архивные запросы.
+Опирается на Перечень типовых управленческих архивных документов
+(Приказ Росархива от 20.12.2019 № 236) и Правила организации хранения
+(Приказ Минкультуры от 31.03.2015 № 526).
+
+**Новые модели:**
+- `DestructionAct` — акт о выделении к уничтожению: `ActNumber`
+  (уникальный регистрационный номер, 64), `ActDate`, `Status`
+  (`DestructionStatus`: `Draft / Approved / Executed / Cancelled`),
+  `DraftedByEmployee` (архивариус-составитель), `ApprovedByEmployee`
+  (утвердивший), `ApprovedAt`, `ExecutedAt`, `DestructionMethod`
+  (шредер / сжигание / промышленная переработка), `Notes`. **Не
+  наследует `Document`** — это внутренний документ архива, не
+  проходящий обычный маршрут согласования / подписания и не
+  попадающий в журналы РКК.
+- `DestructionActItem` — строка акта (снимок дела): `DestructionActId`
+  (FK + `ON DELETE CASCADE`), `NomenclatureCaseId` (FK, nullable —
+  дело может быть удалено), денормализованные `CaseIndex / CaseTitle /
+  CaseYear / RetentionYears / DocumentCount / Article / Notes`. Снимок
+  фиксируется в момент составления акта, дальнейшее изменение
+  исходного `NomenclatureCase` не отражается на строке.
+- `DestructionStatus` — стейт-машина акта: `Draft → Approved → Executed`
+  с возможностью `Cancelled` из `Draft / Approved` (но не из
+  `Executed`).
+- `ArchiveResponseKind` — тип DOCX-ответа архива: `Spravka` (справка) /
+  `Vypiska` (выписка) / `Kopiya` (копия).
+
+**`ArchiveRetentionService` (стейт-машина акта):**
+- `FindEligibleForDestruction(asOf)` — возвращает дела с истёкшим
+  сроком (`Year + RetentionPeriodYears <= asOf.Year`, `RetentionPeriodYears > 0`).
+  Включает дела с `IsActive=false`. Пишет аудит
+  `RetentionScanCompleted`.
+- `DraftAct(actNumber, actDate, draftedBy, caseIds, notes?)` —
+  создаёт проект акта. Состав строк формируется снимком (индекс /
+  заголовок / год / срок / статья копируются из дел;
+  `DocumentCount` считается через
+  `IDocumentRepository.Search(NomenclatureCaseId=…)`). Дедуплицирует
+  `caseIds`. Отвергает дела с `RetentionPeriodYears <= 0` (постоянное
+  хранение). Пишет аудит `DestructionActDrafted`.
+- `ApproveAct(actId, approvedBy, approvedAt)` — `Draft → Approved`,
+  ставит `ApprovedByEmployeeId / ApprovedAt`. Аудит
+  `DestructionActApproved`.
+- `ExecuteAct(actId, executedAt, destructionMethod?)` —
+  `Approved → Executed`, ставит `ExecutedAt / DestructionMethod`.
+  Аудит `DestructionActExecuted`.
+- `CancelAct(actId, reason?)` — `Draft|Approved → Cancelled`. Из
+  `Executed` отменить нельзя (нарушение целостности журнала).
+  `reason` дописывается в `Notes`. Аудит `DestructionActCancelled`.
+
+**`ReportService` (DOCX-выгрузка):**
+- `GenerateDestructionAct(actId, filePath)` — Word-форма акта по
+  приложению № 21 (Приказ Минкультуры от 31.03.2015 № 526) с
+  таблицей `№ / Индекс / Заголовок / Крайние даты / Кол-во
+  документов / Срок хранения / Статья / Примечание`, шапкой с
+  реквизитами учреждения, итогами и блоком подписей
+  (`DraftedBy / ApprovedBy / ExecutedAt`). Аудит
+  `DocumentExportedToDocx`.
+- `GenerateArchiveResponse(archiveRequestId, kind, filePath)` —
+  Word-ответ архива для `ArchiveRequest` с шаблонным текстом по типу
+  (`Spravka / Vypiska / Kopiya`), реквизитами архивного отдела
+  (`OrganizationProfile.ArchiveDepartmentName`, `ArchiveAddress`,
+  `ArchivePhone`, `ArchiveEmail`, `ArchiveHeadShortName`) и блоком
+  «МП». Аудит `ArchiveResponseIssued`.
+
+**Новые `AuditActionType` (120…125):**
+`RetentionScanCompleted`, `DestructionActDrafted`,
+`DestructionActApproved`, `DestructionActExecuted`,
+`DestructionActCancelled`, `ArchiveResponseIssued`.
+
+**Миграция `AddArchiveRetentionPhase19`:**
+- Создаёт таблицы `DestructionActs` и `DestructionActItems` с FK /
+  индексами / уникальными ограничениями (`UQ_DestructionActs_ActNumber`,
+  `IX_DestructionActs_Status / ActDate / DraftedByEmployeeId /
+  ApprovedByEmployeeId`).
+- `DestructionActItems.DestructionActId` имеет `ON DELETE CASCADE` —
+  при удалении акта его строки уходят вместе с ним.
+  `NomenclatureCaseId` — без каскада: после уничтожения дела
+  `NomenclatureCase` может быть удалена, но строка акта остаётся
+  благодаря денормализации.
+- Параллельно отражена в `scripts/create-db.sql` (для свежих
+  установок).
+
+**DI:** в `AppServices` зарегистрированы singleton'ом
+`IDestructionActRepository` (EF6) и `IArchiveRetentionService`.
+`ReportService` получает дополнительную зависимость
+`IDestructionActRepository` через 8-аргументный конструктор; 7- /
+5- / 2-аргументные перегрузки сохранены ради совместимости.
+
+**RBAC:** составление и просмотр актов уничтожения —
+`Archivist / Admin`; утверждение и отметка об исполнении —
+`Admin` (руководитель / зам по АХЧ). Формирование ответов архива —
+`Archivist / Admin`. Конкретная привязка проверяется в UI и в
+follow-up для `RolePolicy`.
+
+**Что вынесено в follow-up:**
+- WPF-UI: `DestructionActsView` (журнал актов, фильтр по статусу,
+  кнопки `Утвердить / Исполнить / Отменить / DOCX`) и
+  `ArchiveResponseDialog` (выбор `ArchiveResponseKind` + кнопка
+  «Сформировать DOCX»).
+- Полнотекстовый индекс по содержимому `Attachment` (`AttachmentTextIndex`) —
+  отдельная фаза, требующая Tika/IFilter-извлечения.
+- Расширение `RolePolicy` на модуль `archive-retention`.
+- Автоматическое прикладывание DOCX-акта к
+  `DestructionAct.AttachmentId` после `GenerateDestructionAct`
+  (сейчас файл сохраняется на диск, но не привязывается к акту).
+
 ---
 
 ## Бизнес-инварианты (проверены тестами)
