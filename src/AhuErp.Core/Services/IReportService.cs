@@ -152,5 +152,39 @@ namespace AhuErp.Core.Services
         /// <param name="tripId">Идентификатор <see cref="Models.VehicleTrip"/>.</param>
         /// <param name="filePath">Путь, по которому будет записан DOCX.</param>
         void GenerateTripWaybill(int tripId, string filePath);
+
+        // ------------------------------------------------------------
+        // Phase 19 / Improvement #16 — архив и долговременное хранение.
+        // ------------------------------------------------------------
+
+        /// <summary>
+        /// Генерирует Word-форму акта о выделении к уничтожению (DOCX) по
+        /// конкретному <see cref="Models.DestructionAct"/>. Структура соответствует
+        /// приложению № 21 к Правилам организации хранения, комплектования,
+        /// учёта и использования документов Архивного фонда РФ (Приказ
+        /// Минкультуры от 31.03.2015 № 526) и Приказу Росархива от 20.12.2019 № 236.
+        /// В таблицу попадают: индекс дела, заголовок, годы, срок хранения,
+        /// количество документов, статья по перечню типовых документов.
+        /// </summary>
+        /// <param name="actId">Идентификатор <see cref="Models.DestructionAct"/>.</param>
+        /// <param name="filePath">Путь, по которому будет записан DOCX.</param>
+        void GenerateDestructionAct(int actId, string filePath);
+
+        /// <summary>
+        /// Генерирует Word-ответ архива (DOCX) на основании заполненного
+        /// <see cref="Models.ArchiveRequest"/>:
+        /// <list type="bullet">
+        ///   <item><description><see cref="Models.ArchiveResponseKind.Spravka"/> —
+        ///     архивная справка (официальный документ с собственным текстом).</description></item>
+        ///   <item><description><see cref="Models.ArchiveResponseKind.Vypiska"/> —
+        ///     архивная выписка (дословное извлечение).</description></item>
+        ///   <item><description><see cref="Models.ArchiveResponseKind.Kopiya"/> —
+        ///     архивная копия (заверение копии документа).</description></item>
+        /// </list>
+        /// </summary>
+        /// <param name="archiveRequestId">Идентификатор <see cref="Models.ArchiveRequest"/>.</param>
+        /// <param name="kind">Тип ответа архива.</param>
+        /// <param name="filePath">Путь, по которому будет записан DOCX.</param>
+        void GenerateArchiveResponse(int archiveRequestId, Models.ArchiveResponseKind kind, string filePath);
     }
 }

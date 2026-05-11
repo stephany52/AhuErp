@@ -353,6 +353,8 @@ namespace AhuErp.Tests
             public void ExportArchiveTransferJournal(IEnumerable<ArchiveTransfer> transfers, string filePath) { }
             public void ExportContractsJournal(IEnumerable<Document> contracts, DateTime from, DateTime to, string filePath) { }
             public void GenerateTripWaybill(int tripId, string filePath) { }
+            public void GenerateDestructionAct(int actId, string filePath) { }
+            public void GenerateArchiveResponse(int archiveRequestId, ArchiveResponseKind kind, string filePath) { }
         }
 
         private sealed class StubFileDialogService : IFileDialogService

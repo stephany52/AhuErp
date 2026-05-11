@@ -91,6 +91,10 @@ namespace AhuErp.Core.Data
         public virtual DbSet<MaintenanceRequest> MaintenanceRequests { get; set; }
         public virtual DbSet<FixedAsset> FixedAssets { get; set; }
 
+        // Phase 19 / Improvement #16 — архив: акты о выделении к уничтожению.
+        public virtual DbSet<DestructionAct> DestructionActs { get; set; }
+        public virtual DbSet<DestructionActItem> DestructionActItems { get; set; }
+
         public override int SaveChanges()
         {
             ValidateDocumentRegistrationNumbers();
@@ -687,6 +691,31 @@ namespace AhuErp.Core.Data
                 .HasOptional(a => a.DecommissionDocument)
                 .WithMany()
                 .HasForeignKey(a => a.DecommissionDocumentId)
+                .WillCascadeOnDelete(false);
+
+            // ---- Phase 19 / Improvement #16 — архивные акты о выделении к уничтожению. ----
+            modelBuilder.Entity<DestructionAct>().ToTable("DestructionActs");
+            modelBuilder.Entity<DestructionAct>()
+                .HasRequired(a => a.DraftedByEmployee)
+                .WithMany()
+                .HasForeignKey(a => a.DraftedByEmployeeId)
+                .WillCascadeOnDelete(false);
+            modelBuilder.Entity<DestructionAct>()
+                .HasOptional(a => a.ApprovedByEmployee)
+                .WithMany()
+                .HasForeignKey(a => a.ApprovedByEmployeeId)
+                .WillCascadeOnDelete(false);
+
+            modelBuilder.Entity<DestructionActItem>().ToTable("DestructionActItems");
+            modelBuilder.Entity<DestructionActItem>()
+                .HasRequired(i => i.DestructionAct)
+                .WithMany(a => a.Items)
+                .HasForeignKey(i => i.DestructionActId)
+                .WillCascadeOnDelete(true);
+            modelBuilder.Entity<DestructionActItem>()
+                .HasOptional(i => i.NomenclatureCase)
+                .WithMany()
+                .HasForeignKey(i => i.NomenclatureCaseId)
                 .WillCascadeOnDelete(false);
 
             base.OnModelCreating(modelBuilder);

@@ -172,7 +172,8 @@ namespace AhuErp.UI.Infrastructure
                 sp.GetRequiredService<ITaskRepository>(),
                 sp.GetRequiredService<INomenclatureRepository>(),
                 sp.GetRequiredService<IVehicleRepository>(),
-                sp.GetRequiredService<IAuditService>()));
+                sp.GetRequiredService<IAuditService>(),
+                sp.GetRequiredService<IDestructionActRepository>()));
 
             // Phase 17 / Improvement #14 — паспортные данные ТС, ОСАГО / ТО,
             // печать путевого листа. Сервис идемпотентно создаёт уведомления
