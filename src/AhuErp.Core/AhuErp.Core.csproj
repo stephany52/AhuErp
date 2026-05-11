@@ -16,6 +16,9 @@
     <PackageReference Include="ClosedXML" Version="0.102.3" />
     <PackageReference Include="DocumentFormat.OpenXml" Version="2.20.0" />
     <PackageReference Include="PdfPig" Version="0.1.9" />
+    <!-- Improvement #18: structured-логи через Serilog. Sink-и (RollingFile,
+         EventLog) подключает AhuErp.UI; Core держит только фасад. -->
+    <PackageReference Include="Serilog" Version="3.1.1" />
   </ItemGroup>
 
   <ItemGroup>
@@ -35,5 +38,12 @@
       <LogicalName>AhuErp.Core.Migrations.$([System.String]::Copy('%(Filename)').Substring($([System.String]::Copy('%(Filename)').IndexOf('_'))).Substring(1)).resources</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
+
+  <!--
+    Improvement #18 — каркас локализации. Strings.resx → нейтральная
+    сборка (русская), Strings.<culture>.resx → satellite assembly,
+    подгружается по CultureInfo.CurrentUICulture. SDK сам строит
+    en\AhuErp.Core.resources.dll из Strings.en.resx по конвенции имени.
+  -->
 
 </Project>

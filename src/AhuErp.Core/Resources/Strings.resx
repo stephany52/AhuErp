@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!--
+    Phase 20 / Improvement #18 — каркас локализации.
+    Этот файл (Strings.resx) — нейтральный (русский), Strings.en.resx —
+    англоязычные значения. ResourceManager выбирает культуру по
+    CultureInfo.CurrentUICulture.
+
+    Конвенция имён:
+      App_*       — общие подписи приложения, статусы, тосты
+      Procurement_*  — раздел закупок (Phase 20)
+      Validation_*   — сообщения валидации сервисов
+
+    На текущей итерации добавлены ключи только для нового раздела
+    «Закупки 44-ФЗ»; миграция остального UI на ResourceManager —
+    инкрементально, по мере правок отдельных Views.
+  -->
+  <xsd:schema id="root" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata" />
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+
+  <data name="App_Refresh" xml:space="preserve"><value>Обновить</value></data>
+  <data name="App_OK" xml:space="preserve"><value>ОК</value></data>
+  <data name="App_Cancel" xml:space="preserve"><value>Отмена</value></data>
+  <data name="App_Save" xml:space="preserve"><value>Сохранить</value></data>
+
+  <data name="Procurement_Module" xml:space="preserve"><value>Закупки 44-ФЗ</value></data>
+  <data name="Procurement_PlansTitle" xml:space="preserve"><value>Планы-графики</value></data>
+  <data name="Procurement_ContractsTitle" xml:space="preserve"><value>Контракты</value></data>
+  <data name="Procurement_UpcomingMilestonesTitle" xml:space="preserve"><value>Этапы в ближайшие 30 дней</value></data>
+  <data name="Procurement_TotalCommitted" xml:space="preserve"><value>Суммарные обязательства</value></data>
+  <data name="Procurement_Year" xml:space="preserve"><value>Год</value></data>
+  <data name="Procurement_Title" xml:space="preserve"><value>Наименование</value></data>
+  <data name="Procurement_Status" xml:space="preserve"><value>Статус</value></data>
+  <data name="Procurement_EisRegistration" xml:space="preserve"><value>Рег. номер в ЕИС</value></data>
+  <data name="Procurement_SupplierName" xml:space="preserve"><value>Поставщик</value></data>
+  <data name="Procurement_ContractAmount" xml:space="preserve"><value>Сумма контракта</value></data>
+  <data name="Procurement_RegistrationNumber" xml:space="preserve"><value>№ контракта</value></data>
+
+  <data name="Validation_YearRequired" xml:space="preserve"><value>Год обязателен.</value></data>
+  <data name="Validation_PlanTitleRequired" xml:space="preserve"><value>Наименование плана обязательно.</value></data>
+  <data name="Validation_EisRegistrationRequired" xml:space="preserve"><value>Регистрационный номер в ЕИС обязателен для публикации.</value></data>
+</root>

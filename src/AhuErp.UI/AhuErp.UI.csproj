@@ -18,6 +18,11 @@
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.2" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
     <PackageReference Include="LiveCharts.Wpf" Version="0.9.7" />
+    <!-- Improvement #18: structured-логи. Rolling file (в %LOCALAPPDATA%\AhuErp\logs)
+         + Windows EventLog (Application). -->
+    <PackageReference Include="Serilog" Version="3.1.1" />
+    <PackageReference Include="Serilog.Sinks.File" Version="5.0.0" />
+    <PackageReference Include="Serilog.Sinks.EventLog" Version="3.1.0" />
   </ItemGroup>
 
   <ItemGroup>

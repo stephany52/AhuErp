@@ -1,5 +1,8 @@
 # AhuErp — ERP/СЭД для МКУ «АХУ» БМР
 
+[![CI](https://github.com/stephany52/AhuErp/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/stephany52/AhuErp/actions/workflows/ci.yml)
+[![Coverage (Coverlet)](https://img.shields.io/badge/coverage-72%25-yellow)](#improvement-18--качество-кода-и-devex)
+
 Информационная система административно-хозяйственного управления и
 электронного документооборота для **МКУ «АХУ» БМР** (Балаковский муниципальный
 район). Покрывает ключевые направления деятельности учреждения:
@@ -90,8 +93,10 @@ AhuErp.sln
 | 15 | Замещения                    | Admin, Manager, Archivist, TechSupport, WhMgr       | Активные замещения сотрудников + автоперенаправление задач                 |
 | 16 | Уведомления (настройки)      | Admin, Manager, Archivist, TechSupport, WhMgr       | Включение/отключение каналов (in-app / email) по типам событий             |
 | 17 | Журнал аудита                | Admin                                               | Хэш-цепочка событий (доступ, экспорт, подписи, изменения)                  |
+| 18 | Закупки 44-ФЗ                | Admin, Manager, DeputyHead (упр.); Clerk (RO)       | План-графики, процедуры (аукционы / запросы котировок / ед. поставщик), контракты как `Document` + этапы с напоминаниями |
 
-Роли: `Admin`, `Manager`, `Archivist`, `TechSupport`, `WarehouseManager`.
+Роли: `Admin`, `Manager`, `Archivist`, `TechSupport`, `WarehouseManager`,
+`Clerk`, `DeputyHead`, `FleetManager`, `HRAdmin`.
 Дополнительные поведенческие проверки в `RolePolicy.Can*(role)`:
 `CanSign`, `CanSignQualified`, `CanManageOrgStructure`, `CanCreateSubstitution`,
 `CanViewReports`, `CanCancelRelatedOperation`, `CanRebuildSearchIndex`,
@@ -123,6 +128,10 @@ AhuErp.sln
 | 14    | Расширение модуля ИТО (системный администратор)      | Каталог `Equipment` (инв. №, тип/статус/MAC/IP/кабинет/ответственный/гарантия), справочник `NetworkSegment` (VLAN/диапазон/маска/шлюз/DNS), журнал `VideoConference` (тема/площадка Zoom/Jitsi/RegionalVks/ссылка/организатор/участники), хронологический `ItTicketDiagnosticEntry`, расширение `ItTicket` (`Kind`, `AffectedEquipmentId` FK, `IsSentToVendor` + поставщик/№ заявки/срок возврата, `CompletedAt`); KPI-плитки на дашборде ИТО (`IItServiceMetricsProvider`: Open/InProgress/Overdue/SentToVendor/CompletedCount/MTTR); миграция `AddItoExpansionPhase14` (4 новые таблицы + 6 колонок к `Documents`) |
 | 15    | Журналы регистрации (44-ФЗ + Устав МКУ «АХУ» БМР)    | Новые модели `SafetyBriefing` (с `BriefingKind`), `Inventarization` + `InventarizationDiscrepancy` (с `InventarizationScope`), `ArchiveTransfer`, `FuelType`; расширение `Vehicle` (`FuelType`, `FuelConsumptionPer100Km`) и `VehicleTrip` (одометр старт/финиш, выданное топливо, маршрут, фактические даты + расчётные `DistanceKm` / `FuelUsedLiters` через норму расхода ТС); репозитории `ISafetyBriefingRepository` / `IInventarizationRepository` / `IArchiveTransferRepository` (EF6 + InMemory); экспорт в XLSX через `IReportService.ExportFuelLog` / `ExportSafetyBriefingsJournal` / `ExportInventarizationsJournal` / `ExportArchiveTransferJournal` / `ExportContractsJournal`; миграция `AddRegistrationJournalsPhase15` (4 новые таблицы + 2 колонки в `Vehicles` + 7 колонок в `VehicleTrips`) |
 | 16    | Безопасность и админ-панель (Bug #8 + Improvement #17) | Парольная политика `IPasswordPolicy` (мин 8 / 1 цифра / 1 заглавная / 1 строчная, 90-дневный срок действия, история последних 5 паролей), `LoginAttempt` (журнал входов с IP, временем, причиной отказа), lockout 5 неудач за 10 минут → блокировка на 30 минут (`Employee.LockedUntil`), AES-256-CBC + HMAC-SHA256 шифрование чувствительных полей через `IDocumentEncryptor` / `AesDocumentEncryptor` (формат `enc:v1:<base64>`), singleton `OrganizationSettings` с настраиваемыми порогами и шифр-ключом, расширенные действия в `AuditActionType` (`LoginAttemptFailed`/`AccountLocked`/`PasswordChanged`/`PasswordExpired`/`AccountUnlocked`/`ConfidentialDocumentViewed`/`DocumentExportedToExcel`/`DocumentExportedToPdf`/`DocumentPrinted`/`DocumentDownloaded`/`RoleChanged`/`SubstitutionChanged`/`EncryptionKeyRotated`), `AttachmentService.Download` с явным `DocumentDownloaded` audit, миграция `AddSecurityAndAdminPhase16` (3 новые таблицы + 2 колонки в `Employees`) |
+| 17    | Паспортные данные ТС, ОСАГО / ТО, путевой лист (Improvement #14) | Расширение `Vehicle` (паспорт ТС, VIN, ОСАГО, ТО), `IFleetMaintenanceService`, печать путевого листа в DOCX, миграция `AddVehiclePassportPhase17` |
+| 18    | Эксплуатация зданий и реестр основных средств (Improvement #15) | `Building / Room / MaintenanceRequest / FixedAsset`, `BuildingService`, `MaintenanceService`, миграция `AddBuildingsAndAssetsPhase18` |
+| 19    | Архив и долговременное хранение (Improvement #16) | `DestructionAct / DestructionActItem`, `ArchiveRetentionService`, DOCX-выгрузка акта и ответов архива, миграция `AddArchiveRetentionPhase19` |
+| 20    | Закупки 44-ФЗ (Improvement #13) | `ProcurementPlan / ProcurementPlanItem / ProcurementProcedure / Contract : Document (TPH) / ContractMilestone`, state-machine плана / процедуры / контракта / этапов, `ProcurementService.TickMilestoneReminders` (DueSoon / Overdue), миграция `AddProcurement44FzPhase20` |
 
 Дополнительная миграция `AddInventoryItemUnitAndMinimumBalance` добавляет
 поля единиц измерения и минимального остатка к `InventoryItem`.
@@ -646,6 +655,141 @@ follow-up для `RolePolicy`.
 - Автоматическое прикладывание DOCX-акта к
   `DestructionAct.AttachmentId` после `GenerateDestructionAct`
   (сейчас файл сохраняется на диск, но не привязывается к акту).
+
+### Phase 20 — закупки 44-ФЗ (Improvement #13)
+
+Закрывает требование «работа в рамках Федерального закона № 44-ФЗ,
+включая процедуры планирования муниципальных закупок» из info.txt.
+Жизненный цикл от плана-графика на год до контракта с этапами
+исполнения и автоматическими напоминаниями о приближении сроков.
+Опирается на ст. 16 (план-график), ст. 24 (способы определения
+поставщика), ст. 94 (приёмка и исполнение) 44-ФЗ и приказы
+Казначейства о размещении в ЕИС.
+
+**Новые модели:**
+- `ProcurementPlan` — план-график на финансовый год: `Year` (уникален),
+  `Title`, `Status` (`ProcurementPlanStatus`: `Draft → Approved →
+  Published → Closed`), `CreatedAt / ApprovedAt / PublishedAt`,
+  `ApprovedByEmployee`, `EisRegistrationNumber` (рег. № в ЕИС),
+  `Notes`.
+- `ProcurementPlanItem` — позиция плана: `LineNumber`, `Okpd2Code`
+  (ОКПД2), `Subject`, `InitialMaxPrice` (НМЦК, decimal 18,2),
+  `Method` (`ProcurementMethod`: электронный аукцион / запрос
+  котировок / закупка у единственного поставщика и др.),
+  `PlannedQuarter` (Q1–Q4), `FundingSource`, `Notes`. FK на план
+  с `ON DELETE CASCADE`.
+- `ProcurementProcedure` — процедура закупки: `EisNoticeNumber`,
+  `Method`, `Status` (`ProcurementProcedureStatus`: `Planned →
+  Announced → BidsAccepted → BidsEvaluation → AwardedDecision →
+  AwardedAndExecuted | Cancelled | Failed`), даты объявления /
+  окончания подачи заявок / решения, реквизиты победителя
+  (`AwardedSupplierInn / AwardedSupplierName / AwardedPrice`), `Notes`.
+- `Contract : Document` (TPH-дискриминатор `Contract`) —
+  муниципальный контракт. Использует регистрационный номер и
+  жизненный цикл документа РКК, но добавляет собственные:
+  `ProcurementProcedure` (FK), `SupplierName / SupplierInn /
+  SupplierKpp`, `ContractAmount` (decimal 18,2), `FundingSource`,
+  `ContractStartDate / ContractEndDate`, `ContractStatus`
+  (`Draft → Signed → InExecution → Executed | Terminated |
+  Cancelled`), `SignedAt / ExecutedAt`, коллекция `Milestones`.
+- `ContractMilestone` — этап исполнения: `SequenceNumber`, `Title`,
+  `PlannedDate / ActualDate`, `Amount` (decimal 18,2), `Status`
+  (`Planned → InProgress → Completed | Overdue | Cancelled`),
+  `DeadlineReminderSentAt` (для идемпотентных напоминаний). FK на
+  контракт с `ON DELETE CASCADE`.
+
+**`ProcurementService`** (фасад со state-machine + аудит):
+- План: `CreatePlan / ApprovePlan / PublishPlan(eisRegistrationNumber)
+  / ClosePlan` — линейный жизненный цикл, проверяет уникальность
+  `Year`. Аудит `ProcurementPlanCreated / *Approved / *Published /
+  *Closed`.
+- Позиции: `AddPlanItem / ListPlanItems` — FK-валидация и аудит.
+- Процедура: `RegisterProcedure / AnnounceProcedure(eisNoticeNumber,
+  announcedAt, bidsDeadline) / AwardProcedure(supplierInn,
+  supplierName, awardedPrice, decisionAt) / CancelProcedure` —
+  переходы статусов и валидация дат. Аудит `ProcurementProcedure*`.
+- Контракт: `RegisterContract / SignContract(signedAt) →
+  автоматически переводит привязанную процедуру в
+  `AwardedAndExecuted` и контракт в `InExecution`, если
+  `ContractStartDate <= signedAt`; `MarkContractExecuted(executedAt)`
+  требует, чтобы все этапы были завершены или отменены;
+  `TerminateContract(reason)` требует непустую причину.
+  Аудит `Contract*`.
+- Этапы: `AddMilestone / CompleteMilestone(actualDate)` —
+  автонумерация `SequenceNumber`, валидация статуса контракта.
+  Аудит `ContractMilestone*`.
+- **`TickMilestoneReminders(now, reminderDays = 7)`** — идемпотентный
+  обход активных этапов: за `reminderDays` дней до `PlannedDate`
+  шлёт `NotificationKind.ContractMilestoneDueSoon`, при просрочке —
+  переводит в `Overdue` и шлёт `ContractMilestoneOverdue`. Повторный
+  вызов в рамках одного дня записей не дублирует (контролируется
+  `DeadlineReminderSentAt`). Получатель — `AssignedEmployee` или
+  `Author` контракта.
+
+**RBAC:**
+- Новый ключ модуля `RolePolicy.Procurement`.
+- `Admin / Manager / DeputyHead` — управление (`CanManageProcurement`).
+- `Clerk` — read-only.
+- `TechSupport / Archivist / WarehouseManager / FleetManager /
+  HRAdmin` — без доступа.
+
+**UI:**
+- Новый раздел в навигации «Закупки 44-ФЗ» (`ProcurementView` +
+  `ProcurementViewModel`). Карточный stub: таблицы планов и
+  контрактов, метрики (планы, контракты в исполнении,
+  обязательства, этапы в окне 30 дней), кнопка «Обновить».
+  Полноценный редактор (мастер регистрации процедуры,
+  drag-and-drop этапов) — отдельная итерация.
+
+**Хранилище:**
+- `ProcurementPlans`, `ProcurementPlanItems`,
+  `ProcurementProcedures`, `ContractMilestones` — отдельные таблицы;
+  поля контракта (`SupplierName / ContractAmount / ContractStatus /
+  …`) добавлены в `dbo.Documents` (TPH), nullable.
+- Decimal precision (18,2) для всех монетарных полей.
+- Миграция `20260513100000_AddProcurement44FzPhase20` + идемпотентное
+  обновление `scripts/create-db.sql`.
+
+### Improvement #18 — Качество кода и DevEx
+
+- **GitHub Actions CI** (`.github/workflows/ci.yml`) — на каждый push в
+  `main` и PR в `main` гоняет `dotnet restore` → `dotnet build -c
+  Release` → `dotnet test -c Release --collect "XPlat Code Coverage"` →
+  `dotnet format --verify-no-changes` (последний шаг помечен
+  `continue-on-error` до окончательной чистки исторических
+  whitespace-замечаний).
+- **Coverlet** (`coverlet.collector 6.0.2`) — собирает
+  `coverage.cobertura.xml` в каждом тестовом прогоне. Текущее
+  покрытие `AhuErp.Core/Services` — **~72%** строк (Ef*-репозитории
+  не покрываются юнит-тестами, т.к. требуют SQL Server; для них
+  ручная приёмка через `scripts/create-db.sql`). InMemory-репозитории
+  и доменные сервисы (`AuthService`, `ApprovalService`,
+  `SignatureService`, `ProcurementService` и т.д.) покрыты >95%.
+- **Serilog** (`Serilog 3.1.1` + `Serilog.Sinks.File 5.0.0` +
+  `Serilog.Sinks.EventLog 3.1.0`). Конфигурация в
+  `App.xaml.cs::ConfigureLogging`:
+  - Rolling-file sink: `%LOCALAPPDATA%\AhuErp\logs\app-<yyyymmdd>.log`,
+    ретенция 31 день, общая писалка.
+  - EventLog sink: `Application/AhuErp`, только под Windows и только
+    `Warning+`. Если у пользователя нет прав на создание Source,
+    падает back-off на file-only без падения UI.
+  - Фасад `AhuErp.Core.Services.AppLog` доступен всем слоям; до
+    инициализации работает как no-op (`Logger.None`), это безопасно
+    для тестов.
+- **`.resx` локализация** — каркас в
+  `src/AhuErp.Core/Resources/`. `Strings.resx` (нейтральная,
+  русская) + `Strings.en.resx` → satellite assembly
+  `en/AhuErp.Core.resources.dll`. Strongly-typed обёртка
+  `AhuErp.Core.Resources.Strings.Procurement_Module` и т.д.
+  Тесты в `LocalizationTests` проверяют переключение
+  `CurrentUICulture`. Миграция остальных строк UI с inline-RU на
+  `.resx` — инкрементально, по мере правок Views.
+- **.editorconfig** — корневые правила (UTF-8 / LF / 4 spaces / final
+  newline) + C#-стиль (var when type apparent, expression-bodied
+  properties, suggestion-уровень для большинства CA*) + пометка
+  миграций как `generated_code` (IDE не шумит на EF-снимках).
+- **Документация** — README обновлён: добавлены секции Phase 20 и
+  Improvement #18, актуализированы счётчики (тесты, фазы).
 
 ---
 

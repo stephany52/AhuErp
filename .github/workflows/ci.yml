@@ -1,0 +1,105 @@
+name: ci
+
+# CI pipeline for AhuErp (Improvement #18).
+#
+# Запускается на каждый push в main и на каждый PR в main. Прогоняет:
+#  1. dotnet restore — восстановление зависимостей.
+#  2. dotnet build -c Release — TWAE-сборка (warnings = errors для
+#     AhuErp.Core и AhuErp.UI).
+#  3. dotnet test -c Release --collect "XPlat Code Coverage" — xUnit с
+#     Coverlet для подсчёта покрытия.
+#  4. dotnet format --verify-no-changes — проверка стиля. Текущая ветка
+#     `feat/improvement-18-devex-ci` оставляет старые pre-existing
+#     whitespace-замечания нетронутыми (это будет вычищено отдельно),
+#     поэтому в самом начале шаг помечен `continue-on-error: true`.
+#
+# Используется ubuntu-latest + Microsoft.NETFramework.ReferenceAssemblies —
+# поэтому никакой Windows runner не нужен, despite TargetFramework=net48.
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    name: Build / Test / Coverage (net48 on Ubuntu)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: dotnet restore
+        run: dotnet restore AhuErp.sln
+
+      - name: dotnet build (Release, TWAE)
+        run: dotnet build AhuErp.sln -c Release --no-restore
+
+      - name: dotnet test (Release, with coverage)
+        run: |
+          dotnet test AhuErp.sln \
+            -c Release \
+            --no-build \
+            --nologo \
+            --logger "trx;LogFileName=test-results.trx" \
+            --collect:"XPlat Code Coverage" \
+            --results-directory ./TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults/**/*
+
+      - name: Upload coverage to Codecov (optional, не падает без токена)
+        if: ${{ env.CODECOV_TOKEN != '' }}
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./TestResults/**/coverage.cobertura.xml
+          flags: unittests
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  format:
+    name: dotnet format --verify-no-changes
+    runs-on: ubuntu-latest
+    # Текущая ветка main содержит pre-existing форматные замечания
+    # в EF6-миграциях; они вычищаются отдельным PR. Чтобы шаг не блокировал
+    # ветку Improvement #18, помечаем его как информационный.
+    continue-on-error: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: dotnet restore
+        run: dotnet restore AhuErp.sln
+
+      - name: dotnet format --verify-no-changes
+        run: dotnet format AhuErp.sln --verify-no-changes --no-restore

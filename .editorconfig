@@ -1,0 +1,79 @@
+# EditorConfig для AhuErp (Improvement #18).
+# Источник: https://editorconfig.org. Поддерживается VS / VS Code / Rider
+# и `dotnet format`.
+
+root = true
+
+# Общие правила для всех файлов.
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 4
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{md,sql}]
+trim_trailing_whitespace = false
+
+[*.{yml,yaml,json,csproj,xaml,resx}]
+indent_size = 2
+
+[*.{xml,config,props,targets,proj}]
+indent_size = 2
+
+# ----------------------------------------------------------------------------
+# C# — стиль кода (см. https://learn.microsoft.com/dotnet/fundamentals/code-analysis/style-rules/).
+# Намеренно мягкие настройки, чтобы не ломать существующий код.
+# ----------------------------------------------------------------------------
+[*.cs]
+indent_size = 4
+# Использовать новейшую версию языка, доступную с net48.
+csharp_using_directive_placement = outside_namespace:suggestion
+csharp_prefer_braces = true:suggestion
+csharp_new_line_before_open_brace = all
+csharp_indent_case_contents = true
+csharp_indent_switch_labels = true
+csharp_space_after_cast = false
+csharp_space_after_keywords_in_control_flow_statements = true
+csharp_space_between_method_declaration_parameter_list_parentheses = false
+csharp_space_between_method_call_parameter_list_parentheses = false
+csharp_space_between_parentheses = false
+csharp_preserve_single_line_blocks = true
+csharp_preserve_single_line_statements = false
+
+# Запретить `var`, когда тип очевиден — оставить на усмотрение разработчика.
+csharp_style_var_for_built_in_types = true:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_elsewhere = true:suggestion
+
+# Современные синтаксические сахара.
+csharp_style_expression_bodied_methods = false:silent
+csharp_style_expression_bodied_constructors = false:silent
+csharp_style_expression_bodied_properties = true:suggestion
+csharp_style_expression_bodied_accessors = true:suggestion
+
+# Code analysis severity по умолчанию — suggestion (не блокирует сборку,
+# но видно в IDE).
+dotnet_analyzer_diagnostic.severity = suggestion
+
+# CA1810 (Initialize static fields inline) и подобные шумные правила — silent.
+dotnet_diagnostic.CA1810.severity = silent
+dotnet_diagnostic.CA1822.severity = silent
+dotnet_diagnostic.CA2208.severity = silent
+
+# IDE0058 (Expression value is never used) — частый и шумный, выключаем.
+dotnet_diagnostic.IDE0058.severity = silent
+
+# IDE0079 (Remove unnecessary suppression) — раздражает при условной компиляции.
+dotnet_diagnostic.IDE0079.severity = silent
+
+# ----------------------------------------------------------------------------
+# Сгенерированные файлы (EF6-миграции, .Designer.cs).
+# dotnet format их не проверяет, но IDE — да.
+# ----------------------------------------------------------------------------
+[**/Migrations/*.cs]
+generated_code = true
+
+[*.Designer.cs]
+generated_code = true

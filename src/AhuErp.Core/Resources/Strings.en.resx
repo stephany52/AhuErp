@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!--
+    Phase 20 / Improvement #18 — English satellite assembly. Loaded when
+    CultureInfo.CurrentUICulture starts with "en". Currently covers the
+    Procurement 44-FZ module; expansion is incremental per View.
+  -->
+  <xsd:schema id="root" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata" />
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+
+  <data name="App_Refresh" xml:space="preserve"><value>Refresh</value></data>
+  <data name="App_OK" xml:space="preserve"><value>OK</value></data>
+  <data name="App_Cancel" xml:space="preserve"><value>Cancel</value></data>
+  <data name="App_Save" xml:space="preserve"><value>Save</value></data>
+
+  <data name="Procurement_Module" xml:space="preserve"><value>Procurement (44-FZ)</value></data>
+  <data name="Procurement_PlansTitle" xml:space="preserve"><value>Plan-graphs</value></data>
+  <data name="Procurement_ContractsTitle" xml:space="preserve"><value>Contracts</value></data>
+  <data name="Procurement_UpcomingMilestonesTitle" xml:space="preserve"><value>Milestones due within 30 days</value></data>
+  <data name="Procurement_TotalCommitted" xml:space="preserve"><value>Total committed amount</value></data>
+  <data name="Procurement_Year" xml:space="preserve"><value>Year</value></data>
+  <data name="Procurement_Title" xml:space="preserve"><value>Title</value></data>
+  <data name="Procurement_Status" xml:space="preserve"><value>Status</value></data>
+  <data name="Procurement_EisRegistration" xml:space="preserve"><value>EIS registration №</value></data>
+  <data name="Procurement_SupplierName" xml:space="preserve"><value>Supplier</value></data>
+  <data name="Procurement_ContractAmount" xml:space="preserve"><value>Contract amount</value></data>
+  <data name="Procurement_RegistrationNumber" xml:space="preserve"><value>Contract №</value></data>
+
+  <data name="Validation_YearRequired" xml:space="preserve"><value>Year is required.</value></data>
+  <data name="Validation_PlanTitleRequired" xml:space="preserve"><value>Plan title is required.</value></data>
+  <data name="Validation_EisRegistrationRequired" xml:space="preserve"><value>EIS registration number is required to publish.</value></data>
+</root>

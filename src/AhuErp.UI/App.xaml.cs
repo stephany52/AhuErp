@@ -1,10 +1,12 @@
 using System;
+using System.IO;
 using System.Text;
 using System.Windows;
 using System.Windows.Threading;
 using AhuErp.Core.Services;
 using AhuErp.UI.Infrastructure;
 using AhuErp.UI.ViewModels;
+using Serilog;
 
 namespace AhuErp.UI
 {
@@ -26,9 +28,68 @@ namespace AhuErp.UI
             DispatcherUnhandledException += OnDispatcherUnhandledException;
             AppDomain.CurrentDomain.UnhandledException += OnDomainUnhandledException;
 
+            ConfigureLogging();
+
             AppServices.Initialize();
 
             ShowLoginAndThenMain();
+        }
+
+        /// <summary>
+        /// Phase 20 / Improvement #18 — структурированное логирование Serilog.
+        /// Sink-и: rolling file (%LOCALAPPDATA%\AhuErp\logs) + Windows EventLog
+        /// (Application source). EventLog требует прав на создание source —
+        /// первый запуск из-под admin создаёт его, в дальнейшем — просто пишет.
+        /// Если что-то не получилось (нет прав, отсутствует папка) — продолжаем
+        /// работать с file-sink, не валим UI.
+        /// </summary>
+        private static void ConfigureLogging()
+        {
+            try
+            {
+                var logsDir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "AhuErp", "logs");
+                Directory.CreateDirectory(logsDir);
+
+                var logger = new LoggerConfiguration()
+                    .MinimumLevel.Information()
+                    .Enrich.WithProperty("Application", "AhuErp.UI")
+                    .WriteTo.File(
+                        path: Path.Combine(logsDir, "app-.log"),
+                        rollingInterval: RollingInterval.Day,
+                        retainedFileCountLimit: 31,
+                        shared: true,
+                        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] "
+                                      + "{SourceContext}: {Message:lj}{NewLine}{Exception}");
+
+                // Windows EventLog только под Windows (на CI Linux — пропускаем).
+                if (Environment.OSVersion.Platform == PlatformID.Win32NT)
+                {
+                    try
+                    {
+                        logger = logger.WriteTo.EventLog(
+                            source: "AhuErp",
+                            logName: "Application",
+                            manageEventSource: false,
+                            restrictedToMinimumLevel: Serilog.Events.LogEventLevel.Warning);
+                    }
+                    catch (Exception eventLogEx)
+                    {
+                        // Не админ — нет права создать source. Пишем в file-sink.
+                        System.Diagnostics.Trace.WriteLine(
+                            $"AhuErp: EventLog sink unavailable: {eventLogEx.Message}");
+                    }
+                }
+
+                AppLog.Configure(logger.CreateLogger());
+                AppLog.Information("AhuErp.UI запущен; журнал в {LogsDir}", logsDir);
+            }
+            catch (Exception ex)
+            {
+                // Логирование само по себе не должно валить старт приложения.
+                System.Diagnostics.Trace.WriteLine($"AhuErp: ConfigureLogging failed: {ex}");
+            }
         }
 
         /// <summary>
@@ -149,6 +210,17 @@ namespace AhuErp.UI
                 sb.AppendLine(current.StackTrace);
                 sb.AppendLine();
             }
+
+            // Phase 20 / Improvement #18: дублируем падение в журнал Serilog.
+            try
+            {
+                AppLog.Fatal(ex, "Необработанная ошибка в {Source}", source);
+            }
+            catch
+            {
+                // Если сам логгер не сконфигурирован — игнорируем.
+            }
+
             MessageBox.Show(
                 sb.ToString(),
                 "Необработанная ошибка",
