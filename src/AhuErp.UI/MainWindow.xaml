@@ -64,6 +64,9 @@
         <DataTemplate DataType="{x:Type vm:NotificationPrefsViewModel}">
             <views:NotificationPrefsView />
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:ProcurementViewModel}">
+            <views:ProcurementView />
+        </DataTemplate>
     </Window.Resources>
 
     <Grid>

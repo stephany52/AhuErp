@@ -95,6 +95,14 @@ namespace AhuErp.Core.Data
         public virtual DbSet<DestructionAct> DestructionActs { get; set; }
         public virtual DbSet<DestructionActItem> DestructionActItems { get; set; }
 
+        // Phase 20 / Improvement #13 — закупки 44-ФЗ: план-график, процедуры,
+        // контракты и этапы исполнения.
+        public virtual DbSet<ProcurementPlan> ProcurementPlans { get; set; }
+        public virtual DbSet<ProcurementPlanItem> ProcurementPlanItems { get; set; }
+        public virtual DbSet<ProcurementProcedure> ProcurementProcedures { get; set; }
+        public virtual DbSet<Contract> Contracts { get; set; }
+        public virtual DbSet<ContractMilestone> ContractMilestones { get; set; }
+
         public override int SaveChanges()
         {
             ValidateDocumentRegistrationNumbers();
@@ -143,6 +151,11 @@ namespace AhuErp.Core.Data
                 .Map<ItTicket>(m =>
                 {
                     m.Requires("DocumentDiscriminator").HasValue("ItTicket");
+                    m.ToTable("Documents");
+                })
+                .Map<Contract>(m =>
+                {
+                    m.Requires("DocumentDiscriminator").HasValue("Contract");
                     m.ToTable("Documents");
                 });
 
@@ -717,6 +730,55 @@ namespace AhuErp.Core.Data
                 .WithMany()
                 .HasForeignKey(i => i.NomenclatureCaseId)
                 .WillCascadeOnDelete(false);
+
+            // ---- Phase 20 / Improvement #13 — закупки 44-ФЗ. ----
+            modelBuilder.Entity<ProcurementPlan>().ToTable("ProcurementPlans");
+            modelBuilder.Entity<ProcurementPlan>()
+                .HasOptional(p => p.ApprovedByEmployee)
+                .WithMany()
+                .HasForeignKey(p => p.ApprovedByEmployeeId)
+                .WillCascadeOnDelete(false);
+
+            modelBuilder.Entity<ProcurementPlanItem>().ToTable("ProcurementPlanItems");
+            modelBuilder.Entity<ProcurementPlanItem>()
+                .HasRequired(i => i.ProcurementPlan)
+                .WithMany(p => p.Items)
+                .HasForeignKey(i => i.ProcurementPlanId)
+                .WillCascadeOnDelete(true);
+            modelBuilder.Entity<ProcurementPlanItem>()
+                .Property(i => i.InitialMaxPrice)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<ProcurementProcedure>().ToTable("ProcurementProcedures");
+            modelBuilder.Entity<ProcurementProcedure>()
+                .HasRequired(p => p.ProcurementPlanItem)
+                .WithMany()
+                .HasForeignKey(p => p.ProcurementPlanItemId)
+                .WillCascadeOnDelete(false);
+            modelBuilder.Entity<ProcurementProcedure>()
+                .Property(p => p.AwardedPrice)
+                .HasPrecision(18, 2);
+
+            // Contract уже отображается на dbo.Documents через TPH (см. выше).
+            // Дополнительные FK / точности.
+            modelBuilder.Entity<Contract>()
+                .HasOptional(c => c.ProcurementProcedure)
+                .WithMany()
+                .HasForeignKey(c => c.ProcurementProcedureId)
+                .WillCascadeOnDelete(false);
+            modelBuilder.Entity<Contract>()
+                .Property(c => c.ContractAmount)
+                .HasPrecision(18, 2);
+
+            modelBuilder.Entity<ContractMilestone>().ToTable("ContractMilestones");
+            modelBuilder.Entity<ContractMilestone>()
+                .HasRequired(m => m.Contract)
+                .WithMany(c => c.Milestones)
+                .HasForeignKey(m => m.ContractId)
+                .WillCascadeOnDelete(true);
+            modelBuilder.Entity<ContractMilestone>()
+                .Property(m => m.Amount)
+                .HasPrecision(18, 2);
 
             base.OnModelCreating(modelBuilder);
         }
